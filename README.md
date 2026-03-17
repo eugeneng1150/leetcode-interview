@@ -4,7 +4,7 @@ LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice fee
 
 ## Status
 
-This repository is in the planning stage. The docs in this repo define the free-tier scope, agent ownership, and implementation contracts for the first build.
+This repository now has a working local prototype of the free-tier extension. The current focus is tightening the local UX, selector reliability, and backend wiring before any deployment work.
 
 ## Free-Tier Scope
 
@@ -68,7 +68,7 @@ These contracts are fixed for the first build:
 - Review response:
   `clarityFeedback`, `timeComplexity`, `spaceComplexity`, `improvementSuggestion`
 - Session summary:
-  `problemUrl`, `problemTitle`, `startedAt`, `endedAt`, `modeEnabled`, `hintCount`, `reviewRequested`
+  `problemUrl`, `problemTitle`, `difficulty`, `startedAt`, `endedAt`, `durationSeconds`, `modeEnabled`, `hintCount`, `reviewRequested`, `notesPreview`
 
 The full shapes are documented in `docs/prompt-design.md`.
 
@@ -78,6 +78,7 @@ The full shapes are documented in `docs/prompt-design.md`.
 - `docs/product-spec.md`: free-tier feature behavior and UX states
 - `docs/dom-selectors.md`: DOM integration contract and selector policy
 - `docs/prompt-design.md`: prompt rules, API contracts, and output requirements
+- `next-step.md`: current build backlog and implementation checklist
 
 ## Repository Structure
 
@@ -98,6 +99,6 @@ The first build is successful when a user can:
 - receive a basic structured review
 - finish a session and have it saved locally
 
-## Next Step After Docs
+## Current Build Tracking
 
-Once the docs are approved, implementation should start with the extension shell, DOM integration, and panel mount contract.
+Use `next-step.md` as the active implementation backlog. Keep the README stable and use that file for moving priorities.

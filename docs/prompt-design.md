@@ -88,11 +88,14 @@ The basic review should return:
 {
   "problemUrl": "string",
   "problemTitle": "string",
+  "difficulty": "Easy | Medium | Hard | null",
   "startedAt": "ISO timestamp",
   "endedAt": "ISO timestamp",
+  "durationSeconds": 0,
   "modeEnabled": true,
   "hintCount": 0,
-  "reviewRequested": false
+  "reviewRequested": false,
+  "notesPreview": "string"
 }
 ```
 
