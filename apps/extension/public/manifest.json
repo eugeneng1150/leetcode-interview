@@ -10,7 +10,7 @@
     "https://leetcode.com/problems/*"
   ],
   "background": {
-    "service_worker": "dist/background/index.js",
+    "service_worker": "background/index.js",
     "type": "module"
   },
   "content_scripts": [
@@ -19,7 +19,7 @@
         "https://leetcode.com/problems/*"
       ],
       "js": [
-        "dist/content/index.js"
+        "content/index.js"
       ],
       "run_at": "document_idle"
     }

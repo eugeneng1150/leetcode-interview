@@ -1,117 +1,655 @@
 import {
   DAILY_FREE_HINT_LIMIT,
+  type HintResponse,
   type ProblemContext,
+  type ReviewResponse,
   type SessionSummary
 } from "@leetcode-interviewer/shared";
 
+type HintUsageState = {
+  used: number;
+  remaining: number;
+  limit: number;
+};
+
+type PanelController = {
+  destroy(): Promise<void>;
+};
+
 type PanelOptions = {
   context: ProblemContext;
+  getDailyHintUsage(): Promise<HintUsageState>;
+  loadLastSessionSummary(): Promise<SessionSummary | null>;
+  loadSessionHistory(): Promise<SessionSummary[]>;
+  loadNotes(): Promise<string>;
+  onDistractionToggle(hidden: boolean): { count: number; hidden: boolean };
+  onHintRequest(input: { userAttempt: string; hintLevel: number }): Promise<HintResponse>;
+  onNotesChange(notes: string): Promise<void>;
+  onResetLocalData(): Promise<void>;
+  onReviewRequest(input: { approach: string; code: string }): Promise<ReviewResponse>;
+  onUseHint(): Promise<HintUsageState & { allowed: boolean }>;
   onSessionComplete(summary: SessionSummary): Promise<void>;
 };
 
-export function renderInterviewPanel(container: HTMLElement, options: PanelOptions): void {
+export function createInterviewPanel(container: HTMLElement, options: PanelOptions): PanelController {
   const root = document.createElement("aside");
   root.dataset.role = "interview-panel";
   root.style.position = "fixed";
-  root.style.top = "16px";
-  root.style.right = "16px";
-  root.style.width = "320px";
+  root.style.top = "20px";
+  root.style.right = "20px";
+  root.style.width = "360px";
+  root.style.maxHeight = "calc(100vh - 40px)";
+  root.style.overflow = "auto";
   root.style.zIndex = "2147483647";
-  root.style.padding = "16px";
-  root.style.borderRadius = "16px";
-  root.style.background = "#101828";
-  root.style.color = "#f8fafc";
-  root.style.boxShadow = "0 20px 40px rgba(15, 23, 42, 0.35)";
-  root.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  root.style.padding = "18px";
+  root.style.borderRadius = "20px";
+  root.style.background = "linear-gradient(180deg, #fcfbf7 0%, #f3efe4 100%)";
+  root.style.color = "#1f2937";
+  root.style.border = "1px solid rgba(180, 157, 104, 0.35)";
+  root.style.boxShadow = "0 24px 50px rgba(15, 23, 42, 0.18)";
+  root.style.fontFamily = "Georgia, 'Times New Roman', serif";
+
+  const eyebrow = document.createElement("p");
+  eyebrow.textContent = "FREE TIER";
+  eyebrow.style.margin = "0 0 6px";
+  eyebrow.style.fontSize = "11px";
+  eyebrow.style.letterSpacing = "0.16em";
+  eyebrow.style.fontWeight = "700";
+  eyebrow.style.color = "#9a6700";
 
   const title = document.createElement("h2");
   title.textContent = "Interview Mode";
-  title.style.margin = "0 0 8px";
+  title.style.margin = "0 0 4px";
+  title.style.fontSize = "28px";
+  title.style.lineHeight = "1.1";
 
   const problem = document.createElement("p");
   problem.textContent = options.context.problemTitle;
-  problem.style.margin = "0 0 12px";
-  problem.style.color = "#cbd5e1";
+  problem.style.margin = "0 0 16px";
+  problem.style.color = "#475467";
+  problem.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  problem.style.fontSize = "13px";
+
+  const modeCard = createCard();
+  modeCard.style.marginBottom = "14px";
+  const modeLabel = createMetaLabel("Mode");
+  const modeValue = document.createElement("p");
+  modeValue.textContent = "Off";
+  modeValue.style.margin = "6px 0 0";
+  modeValue.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  modeValue.style.fontWeight = "700";
+  modeValue.style.fontSize = "16px";
+  modeCard.append(modeLabel, modeValue);
+
+  const controls = document.createElement("div");
+  controls.style.display = "grid";
+  controls.style.gridTemplateColumns = "1fr 1fr";
+  controls.style.gap = "8px";
+  controls.style.marginBottom = "14px";
+
+  const startButton = createButton("Start Interview", "primary");
+  const distractionButton = createButton("Hide Distractions", "secondary");
+  distractionButton.disabled = true;
+  controls.append(startButton, distractionButton);
+
+  const timerCard = createCard();
+  timerCard.style.marginBottom = "14px";
+  const timerLabel = createMetaLabel("Session Timer");
 
   const timer = document.createElement("p");
   timer.textContent = "00:00";
-  timer.style.margin = "0 0 12px";
+  timer.style.margin = "4px 0 0";
+  timer.style.fontSize = "30px";
+  timer.style.fontWeight = "700";
+  timer.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  timerCard.append(timerLabel, timer);
+
+  const hintUsageCard = createCard();
+  hintUsageCard.style.marginBottom = "14px";
+  const hintUsageLabel = createMetaLabel("Hints Today");
+  const hintUsageValue = document.createElement("p");
+  hintUsageValue.style.margin = "4px 0 0";
+  hintUsageValue.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  hintUsageValue.style.fontWeight = "600";
+  const hintUsageMeta = document.createElement("p");
+  hintUsageMeta.style.margin = "8px 0 0";
+  hintUsageMeta.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  hintUsageMeta.style.fontSize = "12px";
+  hintUsageMeta.style.lineHeight = "1.4";
+  hintUsageMeta.style.color = "#667085";
+  hintUsageMeta.textContent = `Free tier includes up to ${DAILY_FREE_HINT_LIMIT} hints per day.`;
+  hintUsageCard.append(hintUsageLabel, hintUsageValue, hintUsageMeta);
+
+  const notesLabel = createMetaLabel("Talk Through Your Approach");
+  notesLabel.style.marginBottom = "8px";
 
   const notes = document.createElement("textarea");
   notes.placeholder = "Talk through your approach...";
-  notes.rows = 6;
+  notes.rows = 7;
   notes.style.width = "100%";
-  notes.style.marginBottom = "12px";
+  notes.style.boxSizing = "border-box";
+  notes.style.border = "1px solid #d0d5dd";
+  notes.style.borderRadius = "14px";
+  notes.style.padding = "12px";
+  notes.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  notes.style.fontSize = "14px";
+  notes.style.background = "rgba(255, 255, 255, 0.88)";
+  notes.style.marginBottom = "14px";
+  notes.disabled = true;
 
-  const hintButton = document.createElement("button");
-  hintButton.textContent = `Get Hint (0/${DAILY_FREE_HINT_LIMIT})`;
-  hintButton.type = "button";
-  hintButton.style.marginRight = "8px";
+  const notesMeta = document.createElement("p");
+  notesMeta.textContent = "Notes save automatically for this problem.";
+  notesMeta.style.margin = "-6px 0 14px";
+  notesMeta.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  notesMeta.style.fontSize = "12px";
+  notesMeta.style.color = "#667085";
 
-  const reviewButton = document.createElement("button");
-  reviewButton.textContent = "Review My Attempt";
-  reviewButton.type = "button";
+  const actions = document.createElement("div");
+  actions.style.display = "grid";
+  actions.style.gridTemplateColumns = "1fr 1fr";
+  actions.style.gap = "8px";
+  actions.style.marginBottom = "14px";
+
+  const hintButton = createButton(`Get Hint`, "secondary");
+  const reviewButton = createButton("Review My Attempt", "secondary");
+  hintButton.disabled = true;
+  reviewButton.disabled = true;
+  actions.append(hintButton, reviewButton);
+
+  const hintCard = createCard();
+  hintCard.style.marginBottom = "14px";
+  const hintLabel = createMetaLabel("Latest Hint");
+  const hintText = document.createElement("p");
+  hintText.textContent = "Start the session to unlock hints.";
+  hintText.style.margin = "6px 0 0";
+  hintText.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  hintText.style.fontSize = "13px";
+  hintText.style.lineHeight = "1.5";
+  const followUp = document.createElement("p");
+  followUp.style.margin = "8px 0 0";
+  followUp.style.color = "#667085";
+  followUp.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  followUp.style.fontSize = "12px";
+  hintCard.append(hintLabel, hintText, followUp);
+
+  const reviewCard = createCard();
+  reviewCard.style.marginBottom = "14px";
+  const reviewLabel = createMetaLabel("Basic Review");
+  const reviewText = document.createElement("p");
+  reviewText.textContent = "No review yet.";
+  reviewText.style.margin = "6px 0 0";
+  reviewText.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  reviewText.style.fontSize = "13px";
+  reviewText.style.lineHeight = "1.5";
+  reviewCard.append(reviewLabel, reviewText);
+
+  const recentSessionsCard = createCard();
+  recentSessionsCard.style.marginBottom = "14px";
+  const recentSessionsLabel = createMetaLabel("Recent Sessions");
+  const recentSessionsList = document.createElement("div");
+  recentSessionsList.style.marginTop = "8px";
+  recentSessionsCard.append(recentSessionsLabel, recentSessionsList);
+
+  const lastSessionCard = createCard();
+  lastSessionCard.style.marginBottom = "14px";
+  const lastSessionLabel = createMetaLabel("Last Saved Session");
+  const lastSessionText = document.createElement("p");
+  lastSessionText.textContent = "No saved session yet.";
+  lastSessionText.style.margin = "6px 0 0";
+  lastSessionText.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  lastSessionText.style.fontSize = "13px";
+  lastSessionText.style.lineHeight = "1.5";
+  lastSessionCard.append(lastSessionLabel, lastSessionText);
+
+  const diagnosticsCard = createCard();
+  diagnosticsCard.style.marginBottom = "14px";
+  const diagnosticsLabel = createMetaLabel("Page Check");
+  const diagnosticsText = document.createElement("p");
+  diagnosticsText.style.margin = "6px 0 0";
+  diagnosticsText.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  diagnosticsText.style.fontSize = "12px";
+  diagnosticsText.style.lineHeight = "1.5";
+  diagnosticsText.style.color = "#475467";
+  diagnosticsText.textContent = buildDiagnosticsSummary(options.context);
+  diagnosticsCard.append(diagnosticsLabel, diagnosticsText);
+
+  const utilities = document.createElement("div");
+  utilities.style.display = "grid";
+  utilities.style.gridTemplateColumns = "1fr";
+  utilities.style.gap = "8px";
+  utilities.style.marginBottom = "14px";
+
+  const resetButton = createButton("Reset Local Data", "secondary");
+  utilities.append(resetButton);
 
   const status = document.createElement("p");
   status.textContent = "Ready to start.";
-  status.style.margin = "12px 0 0";
-  status.style.color = "#cbd5e1";
+  status.style.margin = "14px 0 0";
+  status.style.color = "#475467";
+  status.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  status.style.fontSize = "13px";
 
+  let intervalId: number | null = null;
+  let notesSaveTimer: number | null = null;
   let elapsedSeconds = 0;
+  let sessionStartMs: number | null = null;
   let hintCount = 0;
   let reviewRequested = false;
+  let interviewActive = false;
+  let distractionsHidden = false;
+  let lastReview: ReviewResponse | null = null;
 
-  const intervalId = window.setInterval(() => {
-    elapsedSeconds += 1;
-    timer.textContent = formatElapsed(elapsedSeconds);
-  }, 1000);
+  void hydrate();
 
-  hintButton.addEventListener("click", () => {
-    if (hintCount >= DAILY_FREE_HINT_LIMIT) {
-      status.textContent = "Daily hint limit reached.";
+  startButton.addEventListener("click", async () => {
+    if (!interviewActive) {
+      interviewActive = true;
+      reviewRequested = false;
+      hintCount = 0;
+      elapsedSeconds = 0;
+      sessionStartMs = Date.now();
+      timer.textContent = "00:00";
+      startButton.textContent = "End Session";
+      modeValue.textContent = "On";
+      distractionButton.disabled = false;
+      hintButton.disabled = false;
+      reviewButton.disabled = false;
+      notes.disabled = false;
+      hintText.textContent = "Hints will appear here.";
+      followUp.textContent = "";
+      reviewText.textContent = "No review yet.";
+      status.textContent = "Interview session started.";
+      startTimer();
+      notes.focus();
+      await refreshHintUsage();
+      return;
+    }
+
+    await saveCurrentSession();
+    endSession("Session ended and saved locally.");
+    await refreshLastSession(lastSessionText);
+    await refreshRecentSessions(recentSessionsList);
+  });
+
+  distractionButton.addEventListener("click", () => {
+    if (!interviewActive) {
+      status.textContent = "Start the interview before hiding distractions.";
+      return;
+    }
+
+    const result = options.onDistractionToggle(!distractionsHidden);
+    distractionsHidden = result.hidden;
+    distractionButton.textContent = distractionsHidden ? "Show Distractions" : "Hide Distractions";
+    status.textContent =
+      result.count > 0
+        ? `${distractionsHidden ? "Hidden" : "Restored"} ${result.count} distraction section${result.count === 1 ? "" : "s"}.`
+        : "No known distraction sections found on this page.";
+  });
+
+  hintButton.addEventListener("click", async () => {
+    if (!interviewActive) {
+      status.textContent = "Start the interview before requesting a hint.";
+      return;
+    }
+
+    hintButton.disabled = true;
+    const usage = await options.onUseHint();
+
+    if (!usage.allowed) {
+      hintButton.disabled = true;
+      hintText.textContent = `Free tier limit reached. You have used all ${usage.limit}/${usage.limit} hints for today.`;
+      followUp.textContent = "Come back tomorrow for more hints, or continue with your notes and review.";
+      status.textContent = `Free tier limit reached: ${usage.limit}/${usage.limit} hints used today.`;
+      await refreshHintUsage();
       return;
     }
 
     hintCount += 1;
-    hintButton.textContent = `Get Hint (${hintCount}/${DAILY_FREE_HINT_LIMIT})`;
-    status.textContent = `Hint requested at level ${hintCount}.`;
+    status.textContent = "Generating hint...";
+    const response = await options.onHintRequest({
+      userAttempt: notes.value.trim(),
+      hintLevel: Math.min(hintCount, DAILY_FREE_HINT_LIMIT)
+    });
+
+    renderHint(response, hintText, followUp);
+    status.textContent = `Hint ${hintCount} ready.`;
+    await refreshHintUsage();
   });
 
   reviewButton.addEventListener("click", async () => {
+    if (!interviewActive) {
+      status.textContent = "Start the interview before requesting review.";
+      return;
+    }
+
     if (reviewRequested) {
       status.textContent = "Review already requested for this session.";
       return;
     }
 
-    reviewRequested = true;
-    status.textContent = "Session saved for review.";
-
-    const now = new Date().toISOString();
-    await options.onSessionComplete({
-      problemUrl: options.context.problemUrl,
-      problemTitle: options.context.problemTitle,
-      startedAt: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
-      endedAt: now,
-      modeEnabled: true,
-      hintCount,
-      reviewRequested
+    reviewButton.disabled = true;
+    status.textContent = "Generating basic review...";
+    const response = await options.onReviewRequest({
+      approach: notes.value.trim(),
+      code: ""
     });
+
+    lastReview = response;
+    renderReview(response, reviewText);
+    reviewRequested = true;
+    await saveCurrentSession();
+    status.textContent = "Basic review saved.";
+    await refreshLastSession(lastSessionText);
+    await refreshRecentSessions(recentSessionsList);
   });
 
-  root.append(title, problem, timer, notes, hintButton, reviewButton, status);
+  notes.addEventListener("input", () => {
+    if (notesSaveTimer !== null) {
+      window.clearTimeout(notesSaveTimer);
+    }
+
+    notesSaveTimer = window.setTimeout(() => {
+      void options.onNotesChange(notes.value);
+    }, 250);
+  });
+
+  resetButton.addEventListener("click", async () => {
+    stopTimer();
+    if (notesSaveTimer !== null) {
+      window.clearTimeout(notesSaveTimer);
+      notesSaveTimer = null;
+    }
+    if (distractionsHidden) {
+      options.onDistractionToggle(false);
+    }
+    interviewActive = false;
+    sessionStartMs = null;
+    elapsedSeconds = 0;
+    hintCount = 0;
+    reviewRequested = false;
+    lastReview = null;
+    distractionsHidden = false;
+
+    await options.onResetLocalData();
+
+    notes.value = "";
+    timer.textContent = "00:00";
+    modeValue.textContent = "Off";
+    startButton.textContent = "Start Interview";
+    notes.disabled = true;
+    hintButton.disabled = true;
+    reviewButton.disabled = true;
+    distractionButton.disabled = true;
+    distractionButton.textContent = "Hide Distractions";
+    hintText.textContent = "Start the session to unlock hints.";
+    followUp.textContent = "";
+    reviewText.textContent = "No review yet.";
+    status.textContent = "Local extension data cleared.";
+
+    await refreshHintUsage();
+    await refreshLastSession(lastSessionText);
+    await refreshRecentSessions(recentSessionsList);
+  });
+
+  root.append(
+    eyebrow,
+    title,
+    problem,
+    modeCard,
+    controls,
+    timerCard,
+    hintUsageCard,
+    notesLabel,
+    notes,
+    notesMeta,
+    actions,
+    hintCard,
+    reviewCard,
+    recentSessionsCard,
+    lastSessionCard,
+    diagnosticsCard,
+    utilities,
+    status
+  );
   container.append(root);
 
-  window.addEventListener(
-    "beforeunload",
-    () => {
+  return {
+    async destroy() {
+      if (interviewActive) {
+        await saveCurrentSession();
+      }
+
+      if (notesSaveTimer !== null) {
+        window.clearTimeout(notesSaveTimer);
+        notesSaveTimer = null;
+      }
+
+      if (distractionsHidden) {
+        options.onDistractionToggle(false);
+      }
+
+      stopTimer();
+      root.remove();
+    }
+  };
+
+  async function hydrate(): Promise<void> {
+    const [savedNotes] = await Promise.all([
+      options.loadNotes(),
+      refreshHintUsage(),
+      refreshLastSession(lastSessionText),
+      refreshRecentSessions(recentSessionsList)
+    ]);
+    notes.value = savedNotes;
+  }
+
+  async function refreshHintUsage(): Promise<void> {
+    const usage = await options.getDailyHintUsage();
+    hintUsageValue.textContent = `${usage.remaining} remaining today (${usage.used}/${usage.limit} used)`;
+    if (usage.remaining === 0) {
+      hintUsageMeta.textContent = `Free tier limit reached for today. The limit resets tomorrow on your local date.`;
+    } else {
+      hintUsageMeta.textContent = `Free tier includes up to ${usage.limit} hints per day.`;
+    }
+
+    updateHintButton(usage);
+
+    if (!interviewActive) {
+      return;
+    }
+  }
+
+  async function refreshLastSession(target: HTMLElement): Promise<void> {
+    const lastSession = await options.loadLastSessionSummary();
+    if (!lastSession) {
+      target.textContent = "No saved session yet.";
+      return;
+    }
+
+    target.textContent = formatSessionSummary(lastSession);
+  }
+
+  async function refreshRecentSessions(target: HTMLElement): Promise<void> {
+    const history = await options.loadSessionHistory();
+    target.replaceChildren();
+
+    if (history.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "No recent sessions saved yet.";
+      empty.style.margin = "0";
+      empty.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+      empty.style.fontSize = "13px";
+      empty.style.lineHeight = "1.5";
+      empty.style.color = "#667085";
+      target.append(empty);
+      return;
+    }
+
+    for (const session of history.slice(0, 4)) {
+      const item = document.createElement("p");
+      item.textContent = formatSessionSummary(session);
+      item.style.margin = "0 0 10px";
+      item.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+      item.style.fontSize = "12px";
+      item.style.lineHeight = "1.5";
+      item.style.color = "#475467";
+      target.append(item);
+    }
+  }
+
+  async function saveCurrentSession(): Promise<void> {
+    const summary = buildSessionSummary();
+    await options.onSessionComplete(summary);
+  }
+
+  function buildSessionSummary(): SessionSummary {
+    const startedAt = sessionStartMs ? new Date(sessionStartMs).toISOString() : new Date().toISOString();
+    const endedAt = new Date().toISOString();
+    const durationSeconds = sessionStartMs
+      ? Math.max(0, Math.floor((Date.now() - sessionStartMs) / 1000))
+      : elapsedSeconds;
+
+    return {
+      problemUrl: options.context.problemUrl,
+      problemTitle: options.context.problemTitle,
+      difficulty: options.context.difficulty,
+      startedAt,
+      endedAt,
+      durationSeconds,
+      modeEnabled: interviewActive,
+      hintCount,
+      reviewRequested,
+      notesPreview: notes.value.trim().slice(0, 140)
+    };
+  }
+
+  function startTimer(): void {
+    stopTimer();
+    intervalId = window.setInterval(() => {
+      if (!sessionStartMs) {
+        return;
+      }
+
+      elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartMs) / 1000));
+      timer.textContent = formatElapsed(elapsedSeconds);
+    }, 1000);
+  }
+
+  function stopTimer(): void {
+    if (intervalId !== null) {
       window.clearInterval(intervalId);
-    },
-    { once: true }
-  );
+      intervalId = null;
+    }
+  }
+
+  function endSession(message: string): void {
+    interviewActive = false;
+    stopTimer();
+    sessionStartMs = null;
+    startButton.textContent = "Start Interview";
+    modeValue.textContent = "Off";
+    notes.disabled = true;
+    lastReview = null;
+    hintButton.disabled = true;
+    reviewButton.disabled = true;
+    distractionButton.disabled = true;
+    if (distractionsHidden) {
+      options.onDistractionToggle(false);
+      distractionsHidden = false;
+      distractionButton.textContent = "Hide Distractions";
+    }
+    status.textContent = message;
+  }
+
+  function updateHintButton(usage: HintUsageState): void {
+    if (usage.remaining === 0) {
+      hintButton.textContent = `Hint Limit Reached (${usage.limit}/${usage.limit})`;
+      if (interviewActive) {
+        hintButton.disabled = true;
+      }
+      return;
+    }
+
+    hintButton.textContent = `Get Hint (${usage.used}/${usage.limit})`;
+    if (interviewActive) {
+      hintButton.disabled = false;
+    }
+  }
 }
 
 function formatElapsed(totalSeconds: number): string {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function createButton(label: string, variant: "primary" | "secondary"): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.style.borderRadius = "999px";
+  button.style.padding = "12px 14px";
+  button.style.border = variant === "primary" ? "none" : "1px solid #d0d5dd";
+  button.style.cursor = "pointer";
+  button.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  button.style.fontWeight = "600";
+  button.style.fontSize = "13px";
+  button.style.background = variant === "primary" ? "#111827" : "rgba(255, 255, 255, 0.9)";
+  button.style.color = variant === "primary" ? "#f9fafb" : "#1f2937";
+  return button;
+}
+
+function createCard(): HTMLDivElement {
+  const card = document.createElement("div");
+  card.style.borderRadius = "16px";
+  card.style.padding = "12px 14px";
+  card.style.background = "rgba(255, 255, 255, 0.72)";
+  card.style.border = "1px solid rgba(208, 213, 221, 0.9)";
+  return card;
+}
+
+function createMetaLabel(text: string): HTMLParagraphElement {
+  const label = document.createElement("p");
+  label.textContent = text.toUpperCase();
+  label.style.margin = "0";
+  label.style.fontSize = "10px";
+  label.style.letterSpacing = "0.14em";
+  label.style.fontWeight = "700";
+  label.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  label.style.color = "#9a6700";
+  return label;
+}
+
+function renderHint(response: HintResponse, hintText: HTMLElement, followUp: HTMLElement): void {
+  hintText.textContent = response.hint;
+  followUp.textContent = response.followUpQuestion;
+}
+
+function renderReview(response: ReviewResponse, reviewText: HTMLElement): void {
+  reviewText.innerHTML = [
+    `<strong>Clarity:</strong> ${escapeHtml(response.clarityFeedback)}`,
+    `<strong>Time:</strong> ${escapeHtml(response.timeComplexity)}`,
+    `<strong>Space:</strong> ${escapeHtml(response.spaceComplexity)}`,
+    `<strong>Improve:</strong> ${escapeHtml(response.improvementSuggestion)}`
+  ].join("<br /><br />");
+}
+
+function formatSessionSummary(summary: SessionSummary): string {
+  const duration = formatElapsed(summary.durationSeconds ?? 0);
+  const difficulty = summary.difficulty ? ` • ${summary.difficulty}` : "";
+  const reviewState = summary.reviewRequested ? "reviewed" : "not reviewed";
+  return `${summary.problemTitle}${difficulty} • ${duration} • ${summary.hintCount} hint${summary.hintCount === 1 ? "" : "s"} • ${reviewState}`;
+}
+
+function buildDiagnosticsSummary(context: ProblemContext): string {
+  const difficulty = context.difficulty ?? "Unknown difficulty";
+  const url = new URL(context.problemUrl);
+  return `Detected ${difficulty}. Tracking notes and session data locally for ${url.pathname}.`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

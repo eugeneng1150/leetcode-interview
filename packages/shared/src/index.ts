@@ -38,9 +38,12 @@ export type ReviewResponse = {
 export type SessionSummary = {
   problemUrl: string;
   problemTitle: string;
+  difficulty: Difficulty;
   startedAt: string;
   endedAt: string;
+  durationSeconds: number;
   modeEnabled: boolean;
   hintCount: number;
   reviewRequested: boolean;
+  notesPreview: string;
 };

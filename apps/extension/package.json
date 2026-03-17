@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "dev": "node ./scripts/build.mjs --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@leetcode-interviewer/shared": "*"
   }
 }
