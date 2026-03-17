@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@leetcode-interviewer/shared": [
+        "packages/shared/src/index.ts"
+      ]
+    },
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  }
+}
