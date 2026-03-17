@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@leetcode-interviewer/shared": "*"
+    "@leetcode-interviewer/shared": "*",
+    "openai": "^6.31.0"
   },
   "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "dev": "node ./scripts/dev.mjs",
+    "start": "node ./dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

@@ -1,7 +1,5 @@
-import { DAILY_FREE_HINT_LIMIT, type HintRequest, type HintResponse } from "@leetcode-interviewer/shared";
-import { buildHintPrompt } from "../prompts/hint.js";
-import { generatePlaceholderText } from "../services/model.js";
-import type { ApiError } from "../types/api.js";
+import { DAILY_FREE_HINT_LIMIT, type ApiError, type HintRequest, type HintResponse } from "@leetcode-interviewer/shared";
+import { generateHintResponse } from "../services/model.js";
 
 export async function handleHint(input: HintRequest): Promise<HintResponse | ApiError> {
   if (input.hintLevel < 1 || input.hintLevel > DAILY_FREE_HINT_LIMIT) {
@@ -11,11 +9,5 @@ export async function handleHint(input: HintRequest): Promise<HintResponse | Api
     };
   }
 
-  const prompt = buildHintPrompt(input);
-  const hint = await generatePlaceholderText(`hint level ${input.hintLevel}`);
-
-  return {
-    hint,
-    followUpQuestion: `Prompt prepared with ${prompt.length} characters.`
-  };
+  return generateHintResponse(input);
 }

@@ -4,7 +4,7 @@ LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice fee
 
 ## Status
 
-This repository now has a working local prototype of the free-tier extension. The current focus is tightening the local UX, selector reliability, and backend wiring before any deployment work.
+This repository now has a working local prototype of the free-tier extension plus a local API server for hint and review requests. The current focus is tightening browser-level validation, selector reliability, and code extraction before any deployment work.
 
 ## Free-Tier Scope
 
@@ -88,6 +88,16 @@ The repo is scaffolded for parallel implementation:
 - `apps/api`: hint and review API skeleton
 - `packages/shared`: shared contracts and free-tier constants
 - `docs`: planning and implementation source-of-truth docs
+
+## Local OpenAI Setup
+
+To use OpenAI-backed hints and reviews through the local API:
+
+1. Set `OPENAI_API_KEY` in the shell before starting the API
+2. Optionally set `OPENAI_MODEL`
+3. Run `npm run dev:api`
+
+If `OPENAI_API_KEY` is missing, the backend falls back to the local heuristic generator.
 
 ## Success Criteria
 

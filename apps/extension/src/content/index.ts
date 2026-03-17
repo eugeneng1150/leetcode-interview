@@ -1,6 +1,7 @@
 import type { HintRequest, ReviewRequest } from "@leetcode-interviewer/shared";
+import { extractEditorSnapshot } from "../lib/editor-content";
 import { setDistractionSectionsHidden } from "../lib/page-distractions";
-import { requestHint, requestReview } from "../lib/mock-interview";
+import { requestHint, requestReview } from "../lib/api-client";
 import { extractProblemContext, isSupportedProblemPage } from "../lib/problem-page";
 import {
   clearLocalData,
@@ -110,6 +111,9 @@ async function syncPanel(): Promise<void> {
     loadSessionHistory,
     loadNotes() {
       return loadProblemNotes(context.problemUrl);
+    },
+    getEditorSnapshot() {
+      return extractEditorSnapshot(document, window);
     },
     onDistractionToggle(hidden) {
       distractionsHidden = hidden;

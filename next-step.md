@@ -11,37 +11,21 @@ Working locally today:
 - timer, notes autosave, hint usage tracking, and local review flow work
 - hint limit is enforced locally at `3` per day
 - recent session history, last session summary, and reset-local-data controls exist
+- a local API server exists for `POST /api/hint` and `POST /api/review`
+- the extension is wired to the local API through the background service worker
+- the backend can use OpenAI when `OPENAI_API_KEY` is configured
 - local watch build is available with `npm run dev:extension`
+- local API dev is available with `npm run dev:api`
 
 Not wired yet:
 
-- real API-backed hints and reviews
 - editor code extraction from the LeetCode page
 - broader QA across multiple LeetCode problems
 - deployment or Chrome Web Store packaging
 
 ## Immediate Priorities
 
-### 1. Local API Wiring
-
-Goal:
-Replace the mock in-extension hint/review logic with real calls to a local API server.
-
-Tasks:
-
-- add an HTTP server entrypoint in `apps/api`
-- expose `POST /api/hint` and `POST /api/review`
-- add an extension-side API client in `apps/extension`
-- switch the panel wiring from `mock-interview.ts` to the API client
-- keep a local fallback or typed error state while testing
-
-Definition of done:
-
-- extension successfully calls a local server from the content script
-- hint and review buttons surface API errors clearly
-- mock logic is no longer the default path
-
-### 2. Editor Code Extraction
+### 1. Editor Code Extraction
 
 Goal:
 Send actual code to review instead of only notes.
@@ -58,13 +42,14 @@ Definition of done:
 - review requests include editor code on supported pages
 - failure to read code does not break the panel
 
-### 3. Selector Hardening QA
+### 2. Browser Validation and Selector Hardening QA
 
 Goal:
-Validate the extension across more LeetCode problems and tighten selectors where needed.
+Validate the API-backed extension across more LeetCode problems and tighten selectors where needed.
 
 Tasks:
 
+- run the extension with `npm run dev:api` and confirm hint and review requests succeed from Chrome
 - test on at least 5 to 10 problems across different categories
 - confirm title, description, and difficulty extraction
 - confirm hide/show behavior for discussion and solution areas
@@ -77,7 +62,7 @@ Definition of done:
 
 ## Secondary Priorities
 
-### 4. Better Review UX
+### 3. Better Review UX
 
 Tasks:
 
@@ -85,7 +70,7 @@ Tasks:
 - show whether review used notes only or notes plus code
 - make the saved session summary more readable
 
-### 5. Better Hint UX
+### 4. Better Hint UX
 
 Tasks:
 
@@ -93,7 +78,7 @@ Tasks:
 - show which hint level the user is on
 - improve exhausted-state messaging further if needed
 
-### 6. Local Debug Mode
+### 5. Local Debug Mode
 
 Tasks:
 
@@ -103,7 +88,6 @@ Tasks:
 
 ## Later
 
-- real model integration in `apps/api`
 - server-side quota enforcement if needed
 - local-to-hosted environment configuration
 - packaging for Chrome Web Store

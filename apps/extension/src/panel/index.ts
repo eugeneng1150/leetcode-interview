@@ -5,6 +5,7 @@ import {
   type ReviewResponse,
   type SessionSummary
 } from "@leetcode-interviewer/shared";
+import type { EditorSnapshot } from "../lib/editor-content";
 
 type HintUsageState = {
   used: number;
@@ -22,6 +23,7 @@ type PanelOptions = {
   loadLastSessionSummary(): Promise<SessionSummary | null>;
   loadSessionHistory(): Promise<SessionSummary[]>;
   loadNotes(): Promise<string>;
+  getEditorSnapshot(): EditorSnapshot | null;
   onDistractionToggle(hidden: boolean): { count: number; hidden: boolean };
   onHintRequest(input: { userAttempt: string; hintLevel: number }): Promise<HintResponse>;
   onNotesChange(notes: string): Promise<void>;
@@ -48,6 +50,14 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   root.style.border = "1px solid rgba(180, 157, 104, 0.35)";
   root.style.boxShadow = "0 24px 50px rgba(15, 23, 42, 0.18)";
   root.style.fontFamily = "Georgia, 'Times New Roman', serif";
+  root.style.transition = "width 180ms ease, padding 180ms ease";
+
+  const header = document.createElement("div");
+  header.style.display = "flex";
+  header.style.alignItems = "flex-start";
+  header.style.justifyContent = "space-between";
+  header.style.gap = "12px";
+  header.style.marginBottom = "14px";
 
   const eyebrow = document.createElement("p");
   eyebrow.textContent = "FREE TIER";
@@ -57,6 +67,9 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   eyebrow.style.fontWeight = "700";
   eyebrow.style.color = "#9a6700";
 
+  const titleGroup = document.createElement("div");
+  titleGroup.style.minWidth = "0";
+
   const title = document.createElement("h2");
   title.textContent = "Interview Mode";
   title.style.margin = "0 0 4px";
@@ -65,10 +78,48 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
   const problem = document.createElement("p");
   problem.textContent = options.context.problemTitle;
-  problem.style.margin = "0 0 16px";
+  problem.style.margin = "0";
   problem.style.color = "#475467";
   problem.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
   problem.style.fontSize = "13px";
+  problem.style.lineHeight = "1.4";
+
+  titleGroup.append(eyebrow, title, problem);
+
+  const collapseButton = createButton("Collapse", "secondary");
+  collapseButton.style.padding = "10px 12px";
+  collapseButton.style.flexShrink = "0";
+  collapseButton.style.minWidth = "90px";
+
+  header.append(titleGroup, collapseButton);
+
+  const body = document.createElement("div");
+
+  const collapsedSummary = createCard();
+  collapsedSummary.style.display = "none";
+  collapsedSummary.style.padding = "10px 12px";
+
+  const collapsedMode = createMetaLabel("Mode");
+  const collapsedModeValue = document.createElement("p");
+  collapsedModeValue.style.margin = "6px 0 0";
+  collapsedModeValue.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  collapsedModeValue.style.fontSize = "12px";
+  collapsedModeValue.style.fontWeight = "700";
+
+  const collapsedTimer = document.createElement("p");
+  collapsedTimer.style.margin = "10px 0 0";
+  collapsedTimer.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  collapsedTimer.style.fontSize = "20px";
+  collapsedTimer.style.fontWeight = "700";
+
+  const collapsedHints = document.createElement("p");
+  collapsedHints.style.margin = "8px 0 0";
+  collapsedHints.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  collapsedHints.style.fontSize = "12px";
+  collapsedHints.style.lineHeight = "1.4";
+  collapsedHints.style.color = "#667085";
+
+  collapsedSummary.append(collapsedMode, collapsedModeValue, collapsedTimer, collapsedHints);
 
   const modeCard = createCard();
   modeCard.style.marginBottom = "14px";
@@ -210,7 +261,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   diagnosticsText.style.fontSize = "12px";
   diagnosticsText.style.lineHeight = "1.5";
   diagnosticsText.style.color = "#475467";
-  diagnosticsText.textContent = buildDiagnosticsSummary(options.context);
+  diagnosticsText.textContent = buildDiagnosticsSummary(options.context, options.getEditorSnapshot());
   diagnosticsCard.append(diagnosticsLabel, diagnosticsText);
 
   const utilities = document.createElement("div");
@@ -237,7 +288,8 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   let reviewRequested = false;
   let interviewActive = false;
   let distractionsHidden = false;
-  let lastReview: ReviewResponse | null = null;
+  let lastEditorSnapshot: EditorSnapshot | null = null;
+  let collapsed = false;
 
   void hydrate();
 
@@ -262,6 +314,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       startTimer();
       notes.focus();
       await refreshHintUsage();
+      renderCollapsedState();
       return;
     }
 
@@ -284,6 +337,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       result.count > 0
         ? `${distractionsHidden ? "Hidden" : "Restored"} ${result.count} distraction section${result.count === 1 ? "" : "s"}.`
         : "No known distraction sections found on this page.";
+    renderCollapsedState();
   });
 
   hintButton.addEventListener("click", async () => {
@@ -292,28 +346,46 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       return;
     }
 
-    hintButton.disabled = true;
-    const usage = await options.onUseHint();
-
-    if (!usage.allowed) {
+    const currentUsage = await options.getDailyHintUsage();
+    if (currentUsage.remaining === 0) {
       hintButton.disabled = true;
-      hintText.textContent = `Free tier limit reached. You have used all ${usage.limit}/${usage.limit} hints for today.`;
+      hintText.textContent = `Free tier limit reached. You have used all ${currentUsage.limit}/${currentUsage.limit} hints for today.`;
       followUp.textContent = "Come back tomorrow for more hints, or continue with your notes and review.";
-      status.textContent = `Free tier limit reached: ${usage.limit}/${usage.limit} hints used today.`;
+      status.textContent = `Free tier limit reached: ${currentUsage.limit}/${currentUsage.limit} hints used today.`;
       await refreshHintUsage();
       return;
     }
 
-    hintCount += 1;
+    hintButton.disabled = true;
     status.textContent = "Generating hint...";
-    const response = await options.onHintRequest({
-      userAttempt: notes.value.trim(),
-      hintLevel: Math.min(hintCount, DAILY_FREE_HINT_LIMIT)
-    });
 
-    renderHint(response, hintText, followUp);
-    status.textContent = `Hint ${hintCount} ready.`;
-    await refreshHintUsage();
+    try {
+      const response = await options.onHintRequest({
+        userAttempt: notes.value.trim(),
+        hintLevel: Math.min(hintCount + 1, DAILY_FREE_HINT_LIMIT)
+      });
+
+      const usage = await options.onUseHint();
+      if (!usage.allowed) {
+        hintButton.disabled = true;
+        hintText.textContent = `Free tier limit reached. You have used all ${usage.limit}/${usage.limit} hints for today.`;
+        followUp.textContent = "Come back tomorrow for more hints, or continue with your notes and review.";
+        status.textContent = `Free tier limit reached: ${usage.limit}/${usage.limit} hints used today.`;
+        await refreshHintUsage();
+        return;
+      }
+
+      hintCount += 1;
+      renderHint(response, hintText, followUp);
+      status.textContent = `Hint ${hintCount} ready.`;
+      await refreshHintUsage();
+      renderCollapsedState();
+    } catch (error) {
+      followUp.textContent = "";
+      status.textContent = formatErrorMessage(error, "Hint request failed.");
+      await refreshHintUsage();
+      renderCollapsedState();
+    }
   });
 
   reviewButton.addEventListener("click", async () => {
@@ -329,18 +401,29 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
     reviewButton.disabled = true;
     status.textContent = "Generating basic review...";
-    const response = await options.onReviewRequest({
-      approach: notes.value.trim(),
-      code: ""
-    });
+    try {
+      const editorSnapshot = options.getEditorSnapshot();
+      lastEditorSnapshot = editorSnapshot;
+      const response = await options.onReviewRequest({
+        approach: notes.value.trim(),
+        code: editorSnapshot?.code ?? ""
+      });
 
-    lastReview = response;
-    renderReview(response, reviewText);
-    reviewRequested = true;
-    await saveCurrentSession();
-    status.textContent = "Basic review saved.";
-    await refreshLastSession(lastSessionText);
-    await refreshRecentSessions(recentSessionsList);
+      renderReview(response, reviewText, editorSnapshot);
+      reviewRequested = true;
+      await saveCurrentSession();
+      status.textContent = editorSnapshot
+        ? `Basic review saved using ${formatEditorSource(editorSnapshot.source)}.`
+        : "Basic review saved using notes only. Editor code was not detected.";
+      await refreshLastSession(lastSessionText);
+      await refreshRecentSessions(recentSessionsList);
+      renderCollapsedState();
+    } catch (error) {
+      reviewButton.disabled = false;
+      reviewText.textContent = formatErrorMessage(error, "Review request failed.");
+      status.textContent = formatErrorMessage(error, "Review request failed.");
+      renderCollapsedState();
+    }
   });
 
   notes.addEventListener("input", () => {
@@ -367,7 +450,6 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     elapsedSeconds = 0;
     hintCount = 0;
     reviewRequested = false;
-    lastReview = null;
     distractionsHidden = false;
 
     await options.onResetLocalData();
@@ -384,17 +466,22 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     hintText.textContent = "Start the session to unlock hints.";
     followUp.textContent = "";
     reviewText.textContent = "No review yet.";
+    lastEditorSnapshot = null;
     status.textContent = "Local extension data cleared.";
 
     await refreshHintUsage();
     await refreshLastSession(lastSessionText);
     await refreshRecentSessions(recentSessionsList);
+    diagnosticsText.textContent = buildDiagnosticsSummary(options.context, options.getEditorSnapshot());
+    renderCollapsedState();
   });
 
-  root.append(
-    eyebrow,
-    title,
-    problem,
+  collapseButton.addEventListener("click", () => {
+    collapsed = !collapsed;
+    applyCollapsedLayout();
+  });
+
+  body.append(
     modeCard,
     controls,
     timerCard,
@@ -411,6 +498,8 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     utilities,
     status
   );
+
+  root.append(header, collapsedSummary, body);
   container.append(root);
 
   return {
@@ -441,6 +530,9 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       refreshRecentSessions(recentSessionsList)
     ]);
     notes.value = savedNotes;
+    diagnosticsText.textContent = buildDiagnosticsSummary(options.context, options.getEditorSnapshot());
+    renderCollapsedState();
+    applyCollapsedLayout();
   }
 
   async function refreshHintUsage(): Promise<void> {
@@ -453,6 +545,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     }
 
     updateHintButton(usage);
+    renderCollapsedState(usage);
 
     if (!interviewActive) {
       return;
@@ -549,7 +642,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     startButton.textContent = "Start Interview";
     modeValue.textContent = "Off";
     notes.disabled = true;
-    lastReview = null;
+    lastEditorSnapshot = null;
     hintButton.disabled = true;
     reviewButton.disabled = true;
     distractionButton.disabled = true;
@@ -559,6 +652,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       distractionButton.textContent = "Hide Distractions";
     }
     status.textContent = message;
+    renderCollapsedState();
   }
 
   function updateHintButton(usage: HintUsageState): void {
@@ -573,6 +667,43 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     hintButton.textContent = `Get Hint (${usage.used}/${usage.limit})`;
     if (interviewActive) {
       hintButton.disabled = false;
+    }
+  }
+
+  function applyCollapsedLayout(): void {
+    body.style.display = collapsed ? "none" : "";
+    collapsedSummary.style.display = collapsed ? "" : "none";
+    problem.style.display = collapsed ? "none" : "";
+    eyebrow.style.display = collapsed ? "none" : "";
+    title.textContent = collapsed ? "IM" : "Interview Mode";
+    title.style.fontSize = collapsed ? "18px" : "28px";
+    collapseButton.textContent = collapsed ? "Expand" : "Collapse";
+    collapseButton.style.minWidth = collapsed ? "72px" : "90px";
+    header.style.marginBottom = collapsed ? "10px" : "14px";
+    root.style.width = collapsed ? "170px" : "360px";
+    root.style.padding = collapsed ? "14px" : "18px";
+    renderCollapsedState();
+  }
+
+  function renderCollapsedState(usage?: HintUsageState): void {
+    const currentUsage =
+      usage ??
+      ({
+        used: Number(hintButton.textContent?.match(/\((\d)\/(\d)\)/)?.[1] ?? 0),
+        remaining: 0,
+        limit: DAILY_FREE_HINT_LIMIT
+      } satisfies Partial<HintUsageState>);
+
+    collapsedModeValue.textContent = interviewActive ? "Interview Active" : "Ready";
+    collapsedTimer.textContent = timer.textContent;
+    collapsedHints.textContent = interviewActive
+      ? `${hintCount} hint${hintCount === 1 ? "" : "s"} used this session${reviewRequested ? " • reviewed" : ""}`
+      : reviewRequested
+        ? "Last action: review saved"
+        : "Panel collapsed";
+
+    if (usage && usage.remaining === 0) {
+      collapsedHints.textContent = "Daily hint limit reached";
     }
   }
 }
@@ -625,8 +756,17 @@ function renderHint(response: HintResponse, hintText: HTMLElement, followUp: HTM
   followUp.textContent = response.followUpQuestion;
 }
 
-function renderReview(response: ReviewResponse, reviewText: HTMLElement): void {
+function renderReview(
+  response: ReviewResponse,
+  reviewText: HTMLElement,
+  editorSnapshot: EditorSnapshot | null
+): void {
+  const reviewSource = editorSnapshot
+    ? `Notes plus code from ${escapeHtml(formatEditorSource(editorSnapshot.source))}`
+    : "Notes only. Editor code was not detected.";
+
   reviewText.innerHTML = [
+    `<strong>Source:</strong> ${reviewSource}`,
     `<strong>Clarity:</strong> ${escapeHtml(response.clarityFeedback)}`,
     `<strong>Time:</strong> ${escapeHtml(response.timeComplexity)}`,
     `<strong>Space:</strong> ${escapeHtml(response.spaceComplexity)}`,
@@ -641,10 +781,36 @@ function formatSessionSummary(summary: SessionSummary): string {
   return `${summary.problemTitle}${difficulty} • ${duration} • ${summary.hintCount} hint${summary.hintCount === 1 ? "" : "s"} • ${reviewState}`;
 }
 
-function buildDiagnosticsSummary(context: ProblemContext): string {
+function buildDiagnosticsSummary(context: ProblemContext, editorSnapshot: EditorSnapshot | null): string {
   const difficulty = context.difficulty ?? "Unknown difficulty";
   const url = new URL(context.problemUrl);
-  return `Detected ${difficulty}. Tracking notes and session data locally for ${url.pathname}.`;
+  const editorStatus = editorSnapshot
+    ? `Editor detected via ${formatEditorSource(editorSnapshot.source)}.`
+    : "Editor code not detected yet.";
+  return `Detected ${difficulty}. Tracking notes and session data locally for ${url.pathname}. ${editorStatus}`;
+}
+
+function formatEditorSource(source: EditorSnapshot["source"]): string {
+  switch (source) {
+    case "monaco-model":
+      return "Monaco model";
+    case "textarea":
+      return "editor textarea";
+    case "code-block":
+      return "editor code block";
+    case "visible-lines":
+      return "visible editor lines";
+    default:
+      return "editor fallback";
+  }
+}
+
+function formatErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 function escapeHtml(value: string): string {

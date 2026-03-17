@@ -22,6 +22,11 @@ export type HintResponse = {
   followUpQuestion: string;
 };
 
+export type ApiError = {
+  code: string;
+  message: string;
+};
+
 export type ReviewRequest = {
   problemTitle: string;
   approach: string;

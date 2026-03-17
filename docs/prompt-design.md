@@ -82,6 +82,15 @@ The basic review should return:
 }
 ```
 
+### API error response
+
+```json
+{
+  "code": "string",
+  "message": "string"
+}
+```
+
 ### `SessionSummary`
 
 ```json
@@ -111,3 +120,8 @@ The basic review should return:
 - API responses should be structured JSON only.
 - The backend should not return markdown-heavy or conversational blobs.
 - If model output is malformed, retry or return a typed error for the UI to render.
+- Local development runs the API at `http://127.0.0.1:8787` by default.
+- The local API may use OpenAI when `OPENAI_API_KEY` is configured.
+- If `OPENAI_API_KEY` is missing, the backend falls back to the local heuristic generator.
+- `OPENAI_MODEL` can override the backend model selection.
+- `LEETCODE_INTERVIEWER_FALLBACK_TO_LOCAL=false` disables heuristic fallback when OpenAI fails.

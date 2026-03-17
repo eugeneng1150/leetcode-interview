@@ -6,11 +6,15 @@
     "packages/*"
   ],
   "scripts": {
+    "build:api": "npm run build --workspace @leetcode-interviewer/api",
     "build:extension": "npm run build --workspace @leetcode-interviewer/extension",
+    "dev:api": "npm run dev --workspace @leetcode-interviewer/api",
     "dev:extension": "npm run dev --workspace @leetcode-interviewer/extension",
+    "start:api": "npm run start --workspace @leetcode-interviewer/api",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "esbuild": "^0.27.4",
     "typescript": "^5.7.3"
   }
