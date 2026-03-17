@@ -9,40 +9,28 @@ Working locally today:
 - unpacked Chrome extension loads on supported LeetCode problem pages
 - Interview Mode panel mounts and persists across LeetCode SPA navigation
 - timer, notes autosave, hint usage tracking, and local review flow work
+- the panel can collapse to a compact state to get out of the way while solving
 - hint limit is enforced locally at `3` per day
+- review limit is enforced locally at `1` per session
 - recent session history, last session summary, and reset-local-data controls exist
 - a local API server exists for `POST /api/hint` and `POST /api/review`
 - the extension is wired to the local API through the background service worker
-- the backend can use OpenAI when `OPENAI_API_KEY` is configured
+- the backend can use OpenAI when `OPENAI_API_KEY` is configured, with heuristic fallback when it is not
+- the API can load local config from `apps/api/.env` or `apps/api/.env.local`
+- editor code extraction from the LeetCode page is wired for review requests
+- hint responses stream into the panel while the backend is still generating
+- the panel shows detection status and the editor source used for review
 - local watch build is available with `npm run dev:extension`
 - local API dev is available with `npm run dev:api`
 
 Not wired yet:
 
-- editor code extraction from the LeetCode page
 - broader QA across multiple LeetCode problems
 - deployment or Chrome Web Store packaging
 
 ## Immediate Priorities
 
-### 1. Editor Code Extraction
-
-Goal:
-Send actual code to review instead of only notes.
-
-Tasks:
-
-- inspect the current LeetCode editor DOM patterns
-- add a code extraction helper under `apps/extension/src/lib`
-- pass extracted code into review requests
-- show a clear panel state if code could not be detected
-
-Definition of done:
-
-- review requests include editor code on supported pages
-- failure to read code does not break the panel
-
-### 2. Browser Validation and Selector Hardening QA
+### 1. Browser Validation and Selector Hardening QA
 
 Goal:
 Validate the API-backed extension across more LeetCode problems and tighten selectors where needed.
@@ -62,29 +50,30 @@ Definition of done:
 
 ## Secondary Priorities
 
-### 3. Better Review UX
+### 2. Better Review UX
 
 Tasks:
 
 - improve loading and error messaging around review
-- show whether review used notes only or notes plus code
 - make the saved session summary more readable
+- decide whether the free-tier `1 review per session` state needs any more visual treatment beyond the current disabled button and status copy
 
-### 4. Better Hint UX
+### 3. Better Hint UX
 
 Tasks:
 
 - make hint progression more explicit in the UI
-- show which hint level the user is on
+- show which hint level the user is on before the request is sent
 - improve exhausted-state messaging further if needed
+- evaluate whether streamed hint text should render with a more obvious loading state or cursor effect
 
-### 5. Local Debug Mode
+### 4. Local Debug Mode
 
 Tasks:
 
-- add a small debug toggle for detected page context
-- show which problem fields were extracted
-- show whether editor code was detected
+- turn the current detection status card into an optional debug toggle if it becomes too noisy
+- expose more extracted page fields only when debug mode is enabled
+- surface selector fallback details only when debug mode is enabled
 
 ## Later
 

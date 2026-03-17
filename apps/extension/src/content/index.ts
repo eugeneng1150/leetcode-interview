@@ -120,11 +120,15 @@ async function syncPanel(): Promise<void> {
       return setDistractionSectionsHidden(document, hidden);
     },
     onHintRequest(input) {
-      return requestHint({
-        ...input,
-        problemTitle: context.problemTitle,
-        problemDescription: context.problemDescription
-      } satisfies HintRequest);
+      return requestHint(
+        {
+          userAttempt: input.userAttempt,
+          hintLevel: input.hintLevel,
+          problemTitle: context.problemTitle,
+          problemDescription: context.problemDescription
+        } satisfies HintRequest,
+        input.onProgress
+      );
     },
     onReviewRequest(input) {
       return requestReview({

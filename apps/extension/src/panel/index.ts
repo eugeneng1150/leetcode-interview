@@ -25,7 +25,11 @@ type PanelOptions = {
   loadNotes(): Promise<string>;
   getEditorSnapshot(): EditorSnapshot | null;
   onDistractionToggle(hidden: boolean): { count: number; hidden: boolean };
-  onHintRequest(input: { userAttempt: string; hintLevel: number }): Promise<HintResponse>;
+  onHintRequest(input: {
+    userAttempt: string;
+    hintLevel: number;
+    onProgress?: (hint: string) => void;
+  }): Promise<HintResponse>;
   onNotesChange(notes: string): Promise<void>;
   onResetLocalData(): Promise<void>;
   onReviewRequest(input: { approach: string; code: string }): Promise<ReviewResponse>;
@@ -254,7 +258,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
   const diagnosticsCard = createCard();
   diagnosticsCard.style.marginBottom = "14px";
-  const diagnosticsLabel = createMetaLabel("Page Check");
+  const diagnosticsLabel = createMetaLabel("Detection Status");
   const diagnosticsText = document.createElement("p");
   diagnosticsText.style.margin = "6px 0 0";
   diagnosticsText.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
@@ -305,7 +309,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       modeValue.textContent = "On";
       distractionButton.disabled = false;
       hintButton.disabled = false;
-      reviewButton.disabled = false;
+      updateReviewButton();
       notes.disabled = false;
       hintText.textContent = "Hints will appear here.";
       followUp.textContent = "";
@@ -358,11 +362,22 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
     hintButton.disabled = true;
     status.textContent = "Generating hint...";
+    hintText.textContent = "Generating hint...";
+    followUp.textContent = "Preparing follow-up question...";
 
     try {
       const response = await options.onHintRequest({
         userAttempt: notes.value.trim(),
-        hintLevel: Math.min(hintCount + 1, DAILY_FREE_HINT_LIMIT)
+        hintLevel: Math.min(hintCount + 1, DAILY_FREE_HINT_LIMIT),
+        onProgress(partialHint) {
+          if (!partialHint.trim()) {
+            return;
+          }
+
+          hintText.textContent = partialHint;
+          followUp.textContent = "Preparing follow-up question...";
+          status.textContent = "Streaming hint...";
+        }
       });
 
       const usage = await options.onUseHint();
@@ -395,7 +410,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     }
 
     if (reviewRequested) {
-      status.textContent = "Review already requested for this session.";
+      status.textContent = "Free tier includes 1 review per session. Start a new session for another review.";
       return;
     }
 
@@ -411,6 +426,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
       renderReview(response, reviewText, editorSnapshot);
       reviewRequested = true;
+      updateReviewButton();
       await saveCurrentSession();
       status.textContent = editorSnapshot
         ? `Basic review saved using ${formatEditorSource(editorSnapshot.source)}.`
@@ -460,7 +476,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     startButton.textContent = "Start Interview";
     notes.disabled = true;
     hintButton.disabled = true;
-    reviewButton.disabled = true;
+    updateReviewButton();
     distractionButton.disabled = true;
     distractionButton.textContent = "Hide Distractions";
     hintText.textContent = "Start the session to unlock hints.";
@@ -644,7 +660,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     notes.disabled = true;
     lastEditorSnapshot = null;
     hintButton.disabled = true;
-    reviewButton.disabled = true;
+    updateReviewButton();
     distractionButton.disabled = true;
     if (distractionsHidden) {
       options.onDistractionToggle(false);
@@ -668,6 +684,23 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     if (interviewActive) {
       hintButton.disabled = false;
     }
+  }
+
+  function updateReviewButton(): void {
+    if (!interviewActive) {
+      reviewButton.textContent = "Review My Attempt";
+      reviewButton.disabled = true;
+      return;
+    }
+
+    if (reviewRequested) {
+      reviewButton.textContent = "Review Used (1/1)";
+      reviewButton.disabled = true;
+      return;
+    }
+
+    reviewButton.textContent = "Review My Attempt";
+    reviewButton.disabled = false;
   }
 
   function applyCollapsedLayout(): void {

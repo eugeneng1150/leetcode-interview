@@ -7,9 +7,12 @@ import type {
   ReviewRequest,
   ReviewResponse
 } from "@leetcode-interviewer/shared";
-import { handleHint } from "./routes/hint.js";
+import { loadApiEnv } from "./load-env.js";
+import { handleHint, handleHintStream } from "./routes/hint.js";
 import { handleReview } from "./routes/review.js";
 import { getConfiguredModel, isOpenAIConfigured } from "./services/model.js";
+
+loadApiEnv();
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 8787;
@@ -41,6 +44,27 @@ const server = createServer(async (request, response) => {
         code: "METHOD_NOT_ALLOWED",
         message: "Only POST is supported."
       });
+      return;
+    }
+
+    if (url.pathname === "/api/hint/stream") {
+      const body = await readJsonBody(request);
+      if (!isHintRequest(body)) {
+        writeJson(response, 400, {
+          code: "INVALID_REQUEST",
+          message: "Hint request body is invalid."
+        });
+        return;
+      }
+
+      response.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive"
+      });
+
+      await handleHintStream(body, response);
+      response.end();
       return;
     }
 

@@ -8,6 +8,7 @@ The first release builds the free tier of LeetCode Interviewer Mode as a Chrome 
 
 - Interview Mode toggle
 - session timer
+- collapsible side panel
 - hide and restore solution and discussion sections
 - approach notes input
 - 3 progressive hints per day
@@ -30,7 +31,7 @@ The first release builds the free tier of LeetCode Interviewer Mode as a Chrome 
 3. User enables Interview Mode.
 4. Timer starts when the interview session starts.
 5. User can hide distracting sections and write approach notes.
-6. User can request hints progressively, up to the daily limit.
+6. User can request hints progressively, up to the daily limit, and see hint text stream into the panel while it is generating.
 7. User can request 1 basic review after attempting the problem.
 8. Session summary is saved locally when the session ends or the review completes.
 
@@ -47,6 +48,7 @@ The first release builds the free tier of LeetCode Interviewer Mode as a Chrome 
 - ready to start
 - interview active
 - hint loading
+- hint streaming
 - review loading
 - quota exhausted
 - backend error

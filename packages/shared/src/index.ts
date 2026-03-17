@@ -22,6 +22,21 @@ export type HintResponse = {
   followUpQuestion: string;
 };
 
+export type HintStreamEvent =
+  | {
+      type: "hint_delta";
+      delta: string;
+      hint: string;
+    }
+  | {
+      type: "completed";
+      data: HintResponse;
+    }
+  | {
+      type: "error";
+      error: ApiError;
+    };
+
 export type ApiError = {
   code: string;
   message: string;

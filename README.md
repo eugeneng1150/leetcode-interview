@@ -4,7 +4,7 @@ LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice fee
 
 ## Status
 
-This repository now has a working local prototype of the free-tier extension plus a local API server for hint and review requests. The current focus is tightening browser-level validation, selector reliability, and code extraction before any deployment work.
+This repository now has a working local prototype of the free-tier extension plus a local API server for hint and review requests. The current build supports OpenAI-backed hints and review through the local backend, streamed hint rendering in the panel, editor code extraction, and local session persistence. The current focus is browser-level QA, selector reliability, and UI polish before any deployment work.
 
 ## Free-Tier Scope
 
@@ -12,6 +12,7 @@ The first build includes:
 
 - Interview Mode toggle
 - timer
+- collapsible side panel
 - 3 progressive hints per day
 - basic AI review
 - local session summary
@@ -31,8 +32,9 @@ The first build does not include:
 3. The user enables Interview Mode and starts a timed session.
 4. The extension can hide solution and discussion areas.
 5. The user types approach notes and requests hints when needed.
-6. The user requests a basic review after attempting the problem.
-7. The session summary is saved locally.
+6. Hints stream into the panel as they are generated.
+7. The user requests 1 basic review after attempting the problem.
+8. The session summary is saved locally.
 
 ## Agent Ownership
 
@@ -93,9 +95,10 @@ The repo is scaffolded for parallel implementation:
 
 To use OpenAI-backed hints and reviews through the local API:
 
-1. Set `OPENAI_API_KEY` in the shell before starting the API
-2. Optionally set `OPENAI_MODEL`
-3. Run `npm run dev:api`
+1. Copy `apps/api/.env.example` to `apps/api/.env` or `apps/api/.env.local`
+2. Set `OPENAI_API_KEY`
+3. Optionally change `OPENAI_MODEL`
+4. Run `npm run dev:api`
 
 If `OPENAI_API_KEY` is missing, the backend falls back to the local heuristic generator.
 
@@ -106,7 +109,7 @@ The first build is successful when a user can:
 - open a supported LeetCode problem
 - start Interview Mode
 - use up to 3 progressive hints in a day
-- receive a basic structured review
+- receive 1 basic structured review per session
 - finish a session and have it saved locally
 
 ## Current Build Tracking

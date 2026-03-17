@@ -2,6 +2,7 @@ import type {
   ApiError,
   HintRequest,
   HintResponse,
+  HintStreamEvent,
   ReviewRequest,
   ReviewResponse
 } from "@leetcode-interviewer/shared";
@@ -16,13 +17,66 @@ export class ApiClientError extends Error {
   }
 }
 
-export async function requestHint(input: HintRequest): Promise<HintResponse> {
-  const payload = await sendApiMessage("hint", input);
-  if (!isHintResponse(payload)) {
-    throw new ApiClientError("INVALID_API_RESPONSE", "Hint response was malformed.");
-  }
+export async function requestHint(
+  input: HintRequest,
+  onProgress?: (hint: string) => void
+): Promise<HintResponse> {
+  const port = chrome.runtime.connect({
+    name: "hint-stream"
+  });
 
-  return payload;
+  return new Promise<HintResponse>((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      port.onMessage.removeListener(handleMessage);
+      port.onDisconnect.removeListener(handleDisconnect);
+      port.disconnect();
+    };
+
+    const handleDisconnect = () => {
+      if (settled) {
+        return;
+      }
+
+      cleanup();
+      reject(new ApiClientError("HINT_STREAM_DISCONNECTED", "Hint stream disconnected unexpectedly."));
+    };
+
+    const handleMessage = (message: unknown) => {
+      if (!isHintStreamEvent(message)) {
+        cleanup();
+        reject(new ApiClientError("INVALID_API_RESPONSE", "Hint stream response was malformed."));
+        return;
+      }
+
+      if (message.type === "hint_delta") {
+        onProgress?.(message.hint);
+        return;
+      }
+
+      if (message.type === "completed") {
+        cleanup();
+        resolve(message.data);
+        return;
+      }
+
+      cleanup();
+      reject(new ApiClientError(message.error.code, message.error.message));
+    };
+
+    port.onMessage.addListener(handleMessage);
+    port.onDisconnect.addListener(handleDisconnect);
+    port.postMessage({
+      kind: "start",
+      payload: input
+    });
+  });
 }
 
 export async function requestReview(input: ReviewRequest): Promise<ReviewResponse> {
@@ -68,6 +122,23 @@ function isHintResponse(value: unknown): value is HintResponse {
   }
 
   return typeof value.hint === "string" && typeof value.followUpQuestion === "string";
+}
+
+function isHintStreamEvent(value: unknown): value is HintStreamEvent {
+  if (!isRecord(value) || typeof value.type !== "string") {
+    return false;
+  }
+
+  switch (value.type) {
+    case "hint_delta":
+      return typeof value.delta === "string" && typeof value.hint === "string";
+    case "completed":
+      return "data" in value && isHintResponse(value.data);
+    case "error":
+      return "error" in value && isApiError(value.error);
+    default:
+      return false;
+  }
 }
 
 function isReviewResponse(value: unknown): value is ReviewResponse {
