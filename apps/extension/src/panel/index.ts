@@ -1,7 +1,10 @@
 import {
+  type AssistantConnectionStatus,
+  type AssistantSettingsSummary,
   type HintResponse,
   type ProblemContext,
   type ReviewResponse,
+  type SaveAssistantSettingsInput,
   type SessionSummary
 } from "@leetcode-interviewer/shared";
 import type { EditorSnapshot } from "../lib/editor-content";
@@ -12,11 +15,13 @@ type PanelController = {
 
 type PanelOptions = {
   context: ProblemContext;
+  loadAssistantSettings(): Promise<AssistantSettingsSummary>;
   loadLastSessionSummary(): Promise<SessionSummary | null>;
   loadSessionHistory(): Promise<SessionSummary[]>;
   loadNotes(): Promise<string>;
   getEditorSnapshot(): EditorSnapshot | null;
   onDistractionToggle(hidden: boolean): { count: number; hidden: boolean };
+  onClearAssistantSettings(): Promise<AssistantSettingsSummary>;
   onHintRequest(input: {
     userAttempt: string;
     hintLevel: number;
@@ -25,7 +30,9 @@ type PanelOptions = {
   onNotesChange(notes: string): Promise<void>;
   onResetLocalData(): Promise<void>;
   onReviewRequest(input: { approach: string; code: string }): Promise<ReviewResponse>;
+  onSaveAssistantSettings(input: SaveAssistantSettingsInput): Promise<AssistantSettingsSummary>;
   onSessionComplete(summary: SessionSummary): Promise<void>;
+  onTestAssistantConnection(): Promise<AssistantConnectionStatus>;
 };
 
 export function createInterviewPanel(container: HTMLElement, options: PanelOptions): PanelController {
@@ -137,6 +144,62 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   const distractionButton = createButton("Hide Distractions", "secondary");
   distractionButton.disabled = true;
   controls.append(startButton, distractionButton);
+
+  const settingsCard = createCard();
+  settingsCard.style.marginBottom = "14px";
+  const settingsLabel = createMetaLabel("OpenAI Setup");
+  const settingsSummary = document.createElement("p");
+  settingsSummary.style.margin = "6px 0 0";
+  settingsSummary.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  settingsSummary.style.fontSize = "13px";
+  settingsSummary.style.lineHeight = "1.5";
+  settingsSummary.style.color = "#475467";
+  settingsSummary.textContent = "No API key saved yet.";
+
+  const settingsHelper = document.createElement("p");
+  settingsHelper.textContent = "Your key stays in this Chrome profile. It is used directly for hint and review requests.";
+  settingsHelper.style.margin = "8px 0 0";
+  settingsHelper.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  settingsHelper.style.fontSize = "12px";
+  settingsHelper.style.lineHeight = "1.5";
+  settingsHelper.style.color = "#667085";
+
+  const apiKeyInput = createTextInput("password", "Paste your OpenAI API key");
+  apiKeyInput.style.marginTop = "10px";
+  apiKeyInput.autocomplete = "off";
+  apiKeyInput.spellcheck = false;
+
+  const modelInput = createTextInput("text", "gpt-4.1-mini");
+  modelInput.style.marginTop = "8px";
+
+  const settingsButtons = document.createElement("div");
+  settingsButtons.style.display = "grid";
+  settingsButtons.style.gridTemplateColumns = "1fr 1fr 1fr";
+  settingsButtons.style.gap = "8px";
+  settingsButtons.style.marginTop = "10px";
+
+  const saveSettingsButton = createButton("Save", "secondary");
+  const testSettingsButton = createButton("Test", "secondary");
+  const clearSettingsButton = createButton("Clear", "secondary");
+  settingsButtons.append(saveSettingsButton, testSettingsButton, clearSettingsButton);
+
+  const settingsStatus = document.createElement("p");
+  settingsStatus.textContent = "Save your API key to enable hints and review.";
+  settingsStatus.style.margin = "10px 0 0";
+  settingsStatus.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  settingsStatus.style.fontSize = "12px";
+  settingsStatus.style.lineHeight = "1.5";
+  settingsStatus.style.color = "#475467";
+
+  settingsCard.append(
+    settingsLabel,
+    settingsSummary,
+    settingsHelper,
+    apiKeyInput,
+    modelInput,
+    settingsButtons,
+    settingsStatus
+  );
 
   const timerCard = createCard();
   timerCard.style.marginBottom = "14px";
@@ -282,6 +345,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   let hintCount = 0;
   let reviewRequested = false;
   let interviewActive = false;
+  let assistantConfigured = false;
   let distractionsHidden = false;
   let lastEditorSnapshot: EditorSnapshot | null = null;
   let collapsed = false;
@@ -305,7 +369,9 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       hintText.textContent = "Hints will appear here.";
       followUp.textContent = "";
       reviewText.textContent = "No review yet.";
-      status.textContent = "Interview session started.";
+      status.textContent = assistantConfigured
+        ? "Interview session started."
+        : "Interview session started. Add your OpenAI API key below to enable hints and review.";
       startTimer();
       notes.focus();
       refreshHintProgress();
@@ -458,6 +524,73 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     renderCollapsedState();
   });
 
+  saveSettingsButton.addEventListener("click", async () => {
+    saveSettingsButton.disabled = true;
+    testSettingsButton.disabled = true;
+    clearSettingsButton.disabled = true;
+    settingsStatus.textContent = "Saving OpenAI settings...";
+
+    try {
+      const summary = await options.onSaveAssistantSettings({
+        apiKey: apiKeyInput.value,
+        model: modelInput.value
+      });
+      apiKeyInput.value = "";
+      applyAssistantSettings(summary, summary.hasApiKey ? "Settings saved." : "Add an API key to enable hints and review.");
+      status.textContent = summary.hasApiKey
+        ? "OpenAI settings saved. You can now request hints and review."
+        : "OpenAI settings updated, but no API key is saved yet.";
+    } catch (error) {
+      settingsStatus.textContent = formatErrorMessage(error, "Failed to save OpenAI settings.");
+    } finally {
+      saveSettingsButton.disabled = false;
+      testSettingsButton.disabled = false;
+      clearSettingsButton.disabled = false;
+    }
+  });
+
+  testSettingsButton.addEventListener("click", async () => {
+    testSettingsButton.disabled = true;
+    saveSettingsButton.disabled = true;
+    clearSettingsButton.disabled = true;
+    settingsStatus.textContent = "Testing OpenAI connection...";
+
+    try {
+      const result = await options.onTestAssistantConnection();
+      settingsStatus.textContent = result.message;
+      modelInput.value = result.model;
+      status.textContent = result.ok
+        ? `OpenAI ready with ${result.model}.`
+        : result.message;
+    } catch (error) {
+      settingsStatus.textContent = formatErrorMessage(error, "OpenAI connection test failed.");
+    } finally {
+      testSettingsButton.disabled = false;
+      saveSettingsButton.disabled = false;
+      clearSettingsButton.disabled = false;
+    }
+  });
+
+  clearSettingsButton.addEventListener("click", async () => {
+    clearSettingsButton.disabled = true;
+    saveSettingsButton.disabled = true;
+    testSettingsButton.disabled = true;
+    settingsStatus.textContent = "Clearing saved API key...";
+
+    try {
+      const summary = await options.onClearAssistantSettings();
+      apiKeyInput.value = "";
+      applyAssistantSettings(summary, "Saved API key cleared.");
+      status.textContent = "OpenAI key cleared from this Chrome profile.";
+    } catch (error) {
+      settingsStatus.textContent = formatErrorMessage(error, "Failed to clear OpenAI settings.");
+    } finally {
+      clearSettingsButton.disabled = false;
+      saveSettingsButton.disabled = false;
+      testSettingsButton.disabled = false;
+    }
+  });
+
   collapseButton.addEventListener("click", () => {
     collapsed = !collapsed;
     applyCollapsedLayout();
@@ -466,6 +599,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   body.append(
     modeCard,
     controls,
+    settingsCard,
     timerCard,
     hintUsageCard,
     notesLabel,
@@ -505,16 +639,36 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   };
 
   async function hydrate(): Promise<void> {
-    const [savedNotes] = await Promise.all([
+    const [savedNotes, assistantSettings] = await Promise.all([
       options.loadNotes(),
+      options.loadAssistantSettings(),
       refreshLastSession(lastSessionText),
       refreshRecentSessions(recentSessionsList)
     ]);
     notes.value = savedNotes;
+    applyAssistantSettings(assistantSettings);
     refreshHintProgress();
     diagnosticsText.textContent = buildDiagnosticsSummary(options.context, options.getEditorSnapshot());
     renderCollapsedState();
     applyCollapsedLayout();
+  }
+
+  function applyAssistantSettings(summary: AssistantSettingsSummary, message?: string): void {
+    assistantConfigured = summary.hasApiKey;
+    modelInput.value = summary.model;
+    apiKeyInput.placeholder = summary.hasApiKey
+      ? `Saved key: ${summary.apiKeyLabel ?? "Saved"}`
+      : "Paste your OpenAI API key";
+    settingsSummary.textContent = summary.hasApiKey
+      ? `Using ${summary.model} with ${summary.apiKeyLabel ?? "a saved key"}.`
+      : "No API key saved yet.";
+    settingsStatus.textContent =
+      message ??
+      (summary.hasApiKey
+        ? "Hints and review are ready to use."
+        : "Save your API key to enable hints and review.");
+    updateHintButton();
+    updateReviewButton();
   }
 
   function refreshHintProgress(): void {
@@ -522,7 +676,9 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     hintUsageValue.textContent =
       hintCount === 0 ? "No hints used yet. Next hint: Level 1." : `${hintCount} used. Next hint: ${formatHintLevel(nextLevel)}.`;
     hintUsageMeta.textContent =
-      "Hints are unlimited. Level 1 nudges, Level 2 patterns, Level 3+ stronger direction.";
+      assistantConfigured
+        ? "Hints are unlimited. Level 1 nudges, Level 2 patterns, Level 3+ stronger direction."
+        : "Add your OpenAI API key below to unlock unlimited hints and review.";
     updateHintButton();
     renderCollapsedState();
   }
@@ -631,10 +787,10 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   }
 
   function updateHintButton(): void {
-    hintButton.textContent = `Get ${formatHintLevel(hintCount + 1)} Hint`;
-    if (interviewActive) {
-      hintButton.disabled = false;
-    }
+    hintButton.textContent = assistantConfigured
+      ? `Get ${formatHintLevel(hintCount + 1)} Hint`
+      : "Add API Key for Hints";
+    hintButton.disabled = !(interviewActive && assistantConfigured);
   }
 
   function updateReviewButton(): void {
@@ -644,8 +800,12 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       return;
     }
 
-    reviewButton.textContent = reviewRequested ? "Review My Attempt Again" : "Review My Attempt";
-    reviewButton.disabled = false;
+    reviewButton.textContent = assistantConfigured
+      ? reviewRequested
+        ? "Review My Attempt Again"
+        : "Review My Attempt"
+      : "Add API Key for Review";
+    reviewButton.disabled = !assistantConfigured;
   }
 
   function applyCollapsedLayout(): void {
@@ -706,6 +866,22 @@ function createButton(label: string, variant: "primary" | "secondary"): HTMLButt
   button.style.background = variant === "primary" ? "#111827" : "rgba(255, 255, 255, 0.9)";
   button.style.color = variant === "primary" ? "#f9fafb" : "#1f2937";
   return button;
+}
+
+function createTextInput(type: "text" | "password", placeholder: string): HTMLInputElement {
+  const input = document.createElement("input");
+  input.type = type;
+  input.placeholder = placeholder;
+  input.style.width = "100%";
+  input.style.boxSizing = "border-box";
+  input.style.border = "1px solid #d0d5dd";
+  input.style.borderRadius = "12px";
+  input.style.padding = "10px 12px";
+  input.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+  input.style.fontSize = "13px";
+  input.style.background = "rgba(255, 255, 255, 0.9)";
+  input.style.color = "#1f2937";
+  return input;
 }
 
 function createCard(): HTMLDivElement {

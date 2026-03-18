@@ -1,18 +1,36 @@
+import type {
+  ApiError,
+  AssistantConnectionStatus,
+  AssistantSettingsSummary,
+  HintRequest,
+  HintStreamEvent,
+  ReviewRequest,
+  SaveAssistantSettingsInput
+} from "@leetcode-interviewer/shared";
+import {
+  clearAssistantSettings,
+  loadAssistantSettingsSummary,
+  saveAssistantSettings
+} from "./openai-settings";
+import {
+  generateHintResponse,
+  generateReviewResponse,
+  streamHintResponse,
+  testOpenAIConnection
+} from "./openai";
+
 chrome.runtime?.onInstalled?.addListener(() => {
   console.log("LeetCode Interviewer Mode installed");
 });
-
-const LOCAL_API_BASE_URL = "http://127.0.0.1:8787";
 
 chrome.runtime?.onConnect?.addListener?.((port: RuntimePort) => {
   if (port.name !== "hint-stream") {
     return;
   }
 
-  const controller = new AbortController();
-
+  let disconnected = false;
   port.onDisconnect.addListener(() => {
-    controller.abort();
+    disconnected = true;
   });
 
   port.onMessage.addListener((message: unknown) => {
@@ -20,16 +38,16 @@ chrome.runtime?.onConnect?.addListener?.((port: RuntimePort) => {
       return;
     }
 
-    void streamHintToPort(port, message.payload, controller.signal);
+    void streamHintToPort(port, message.payload, () => disconnected);
   });
 });
 
 chrome.runtime?.onMessage?.addListener?.((message: unknown, _sender: unknown, sendResponse: (value: unknown) => void) => {
-  if (!isApiRuntimeMessage(message)) {
+  if (!isRuntimeMessage(message)) {
     return false;
   }
 
-  void handleApiRuntimeMessage(message)
+  void handleRuntimeMessage(message)
     .then((response) => {
       sendResponse(response);
     })
@@ -46,164 +64,105 @@ chrome.runtime?.onMessage?.addListener?.((message: unknown, _sender: unknown, se
   return true;
 });
 
-async function handleApiRuntimeMessage(
-  message: ApiRuntimeMessage
-): Promise<ApiRuntimeSuccessResponse | ApiRuntimeErrorResponse> {
-  const path = message.kind === "hint" ? "/api/hint" : "/api/review";
-
+async function handleRuntimeMessage(
+  message: RuntimeMessage
+): Promise<RuntimeSuccessResponse | RuntimeErrorResponse> {
   try {
-    const response = await fetch(`${LOCAL_API_BASE_URL}${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(message.payload)
-    });
-
-    const payload = (await response.json()) as unknown;
-    if (!response.ok || isApiError(payload)) {
-      return {
-        ok: false,
-        error: isApiError(payload)
-          ? payload
-          : {
-              code: "API_REQUEST_FAILED",
-              message: `Local API returned HTTP ${response.status}.`
-            }
-      };
+    switch (message.kind) {
+      case "hint":
+        return {
+          ok: true,
+          data: await generateHintResponse(message.payload)
+        };
+      case "review":
+        return {
+          ok: true,
+          data: await generateReviewResponse(message.payload)
+        };
+      case "settings:get":
+        return {
+          ok: true,
+          data: await loadAssistantSettingsSummary()
+        };
+      case "settings:save":
+        return {
+          ok: true,
+          data: await saveAssistantSettings(message.payload)
+        };
+      case "settings:clear":
+        return {
+          ok: true,
+          data: await clearAssistantSettings()
+        };
+      case "settings:test":
+        return {
+          ok: true,
+          data: await testOpenAIConnection()
+        };
+      default:
+        return {
+          ok: false,
+          error: {
+            code: "UNKNOWN_BACKGROUND_MESSAGE",
+            message: "Unsupported background request."
+          }
+        };
     }
-
-    return {
-      ok: true,
-      data: payload
-    };
   } catch (error) {
     return {
       ok: false,
       error: {
-        code: "LOCAL_API_UNAVAILABLE",
-        message:
-          error instanceof Error
-            ? `${error.message}. Start the local API with npm run dev:api.`
-            : "Local API is unavailable. Start the local API with npm run dev:api."
+        code: "OPENAI_REQUEST_FAILED",
+        message: error instanceof Error ? error.message : "OpenAI request failed."
       }
     };
   }
 }
 
-async function streamHintToPort(port: RuntimePort, payload: unknown, signal: AbortSignal): Promise<void> {
-  try {
-    const response = await fetch(`${LOCAL_API_BASE_URL}/api/hint/stream`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload),
-      signal
-    });
-
-    if (!response.ok) {
-      const errorPayload = (await safeReadJson(response)) as unknown;
-      port.postMessage({
-        type: "error",
-        error: isApiError(errorPayload)
-          ? errorPayload
-          : {
-              code: "API_REQUEST_FAILED",
-              message: `Local API returned HTTP ${response.status}.`
-            }
-      });
+async function streamHintToPort(
+  port: RuntimePort,
+  payload: HintRequest,
+  isDisconnected: () => boolean
+): Promise<void> {
+  for await (const event of streamHintResponse(payload)) {
+    if (isDisconnected()) {
       return;
     }
 
-    if (!response.body) {
-      port.postMessage({
-        type: "error",
-        error: {
-          code: "LOCAL_API_UNAVAILABLE",
-          message: "Local API did not provide a readable response body."
-        }
-      });
+    port.postMessage(event);
+
+    if (event.type === "completed" || event.type === "error") {
       return;
     }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      buffer = flushPortBuffer(buffer, port);
-    }
-
-    buffer += decoder.decode();
-    flushPortBuffer(buffer, port);
-  } catch (error) {
-    if (signal.aborted) {
-      return;
-    }
-
-    port.postMessage({
-      type: "error",
-      error: {
-        code: "LOCAL_API_UNAVAILABLE",
-        message:
-          error instanceof Error
-            ? `${error.message}. Start the local API with npm run dev:api.`
-            : "Local API is unavailable. Start the local API with npm run dev:api."
-      }
-    });
   }
 }
 
-function flushPortBuffer(buffer: string, port: RuntimePort): string {
-  const lines = buffer.split("\n");
-  const trailing = lines.pop() ?? "";
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
+type RuntimeMessage =
+  | {
+      kind: "hint";
+      payload: HintRequest;
     }
-
-    try {
-      port.postMessage(JSON.parse(trimmed));
-    } catch (error) {
-      port.postMessage({
-        type: "error",
-        error: {
-          code: "INVALID_STREAM_PAYLOAD",
-          message: error instanceof Error ? error.message : "Hint stream payload was malformed."
-        }
-      });
-      return "";
+  | {
+      kind: "review";
+      payload: ReviewRequest;
     }
-  }
-
-  return trailing;
-}
-
-async function safeReadJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-type ApiRuntimeMessage = {
-  kind: "hint" | "review";
-  payload: unknown;
-};
+  | {
+      kind: "settings:get";
+    }
+  | {
+      kind: "settings:save";
+      payload: SaveAssistantSettingsInput;
+    }
+  | {
+      kind: "settings:clear";
+    }
+  | {
+      kind: "settings:test";
+    };
 
 type HintStreamStartMessage = {
   kind: "start";
-  payload: unknown;
+  payload: HintRequest;
 };
 
 type RuntimePort = {
@@ -214,43 +173,38 @@ type RuntimePort = {
   onMessage: {
     addListener(listener: (message: unknown) => void): void;
   };
-  postMessage(message: unknown): void;
+  postMessage(message: HintStreamEvent): void;
 };
 
-type ApiRuntimeSuccessResponse = {
+type RuntimeSuccessResponse = {
   ok: true;
   data: unknown;
 };
 
-type ApiRuntimeErrorResponse = {
+type RuntimeErrorResponse = {
   ok: false;
-  error: {
-    code: string;
-    message: string;
-  };
+  error: ApiError;
 };
 
-function isApiRuntimeMessage(value: unknown): value is ApiRuntimeMessage {
-  if (!isRecord(value)) {
+function isRuntimeMessage(value: unknown): value is RuntimeMessage {
+  if (!isRecord(value) || typeof value.kind !== "string") {
     return false;
   }
 
-  return (
-    (value.kind === "hint" || value.kind === "review") &&
-    "payload" in value
-  );
-}
-
-function isApiError(value: unknown): value is { code: string; message: string } {
-  if (!isRecord(value)) {
-    return false;
+  switch (value.kind) {
+    case "hint":
+      return "payload" in value && isHintRequest(value.payload);
+    case "review":
+      return "payload" in value && isReviewRequest(value.payload);
+    case "settings:get":
+    case "settings:clear":
+    case "settings:test":
+      return true;
+    case "settings:save":
+      return "payload" in value && isSaveAssistantSettingsInput(value.payload);
+    default:
+      return false;
   }
-
-  return typeof value.code === "string" && typeof value.message === "string";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function isHintStreamStartMessage(value: unknown): value is HintStreamStartMessage {
@@ -258,5 +212,42 @@ function isHintStreamStartMessage(value: unknown): value is HintStreamStartMessa
     return false;
   }
 
-  return value.kind === "start" && "payload" in value;
+  return value.kind === "start" && "payload" in value && isHintRequest(value.payload);
+}
+
+function isHintRequest(value: unknown): value is HintRequest {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.problemTitle === "string" &&
+    typeof value.problemDescription === "string" &&
+    typeof value.userAttempt === "string" &&
+    typeof value.hintLevel === "number"
+  );
+}
+
+function isReviewRequest(value: unknown): value is ReviewRequest {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.problemTitle === "string" &&
+    typeof value.approach === "string" &&
+    typeof value.code === "string"
+  );
+}
+
+function isSaveAssistantSettingsInput(value: unknown): value is SaveAssistantSettingsInput {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.apiKey === "string" && typeof value.model === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

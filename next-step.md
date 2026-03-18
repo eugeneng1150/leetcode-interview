@@ -12,31 +12,28 @@ Working locally today:
 - the panel can collapse to a compact state to get out of the way while solving
 - hints and reviews are available without local quota caps
 - recent session history, last session summary, and reset-local-data controls exist
-- a local API server exists for `POST /api/hint` and `POST /api/review`
-- the extension is wired to the local API through the background service worker
-- the backend can use OpenAI when `OPENAI_API_KEY` is configured, with heuristic fallback when it is not
-- the API can load local config from `apps/api/.env` or `apps/api/.env.local`
+- OpenAI key and model settings can be saved directly in the extension panel
+- the extension background service worker calls OpenAI directly with the saved key
 - editor code extraction from the LeetCode page is wired for review requests
 - hint responses stream into the panel while the backend is still generating
 - the panel shows detection status and the editor source used for review
 - local watch build is available with `npm run dev:extension`
-- local API dev is available with `npm run dev:api`
 
 Not wired yet:
 
 - broader QA across multiple LeetCode problems
-- deployment or Chrome Web Store packaging
+- Chrome Web Store packaging and onboarding polish
 
 ## Immediate Priorities
 
 ### 1. Browser Validation and Selector Hardening QA
 
 Goal:
-Validate the API-backed extension across more LeetCode problems and tighten selectors where needed.
+Validate the BYOK extension across more LeetCode problems and tighten selectors where needed.
 
 Tasks:
 
-- run the extension with `npm run dev:api` and confirm hint and review requests succeed from Chrome
+- load the extension, save a test API key, and confirm hint and review requests succeed from Chrome
 - test on at least 5 to 10 problems across different categories
 - confirm title, description, and difficulty extraction
 - confirm hide/show behavior for discussion and solution areas

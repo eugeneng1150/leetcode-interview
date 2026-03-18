@@ -2,7 +2,7 @@
 
 ## Project Goal
 
-Build the local-first version of LeetCode Interviewer Mode first. The current scope includes the Interview Mode toggle, timer, progressive hints, basic AI review, and local session summaries.
+Build the local-first version of LeetCode Interviewer Mode first. The current scope includes the Interview Mode toggle, timer, progressive hints, basic AI review, local session summaries, and bring-your-own-key OpenAI setup.
 
 ## Global Rules
 
@@ -64,16 +64,15 @@ Does not own:
 - backend prompt behavior
 - storage persistence rules
 
-### 4. AI Backend Agent
+### 4. AI Integration Agent
 
 Owns:
 
-- `POST /api/hint`
-- `POST /api/review`
 - prompt templates
 - model integration
 - structured response validation
-- stable hint and review behavior at the API boundary
+- stable hint and review behavior at the extension background boundary
+- OpenAI key handling within the extension runtime
 
 Does not own:
 
@@ -100,7 +99,7 @@ Does not own:
 
 - The LeetCode DOM Agent publishes a normalized problem payload with:
   `problemTitle`, `problemDescription`, `problemUrl`, `difficulty`
-- The AI Backend Agent publishes stable JSON contracts for hint and review requests and responses.
+- The AI Integration Agent publishes stable JSON contracts for hint and review requests and responses.
 - The Persistence and QA Agent publishes local storage keys and the session summary schema.
 - The Interview Panel Agent consumes these contracts and should not invent alternate fields.
 - The Extension Shell Agent owns the top-level wiring between content scripts, panel mount, and shared state flow.

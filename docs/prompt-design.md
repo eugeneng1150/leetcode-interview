@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document locks the current AI behavior and JSON interfaces for hinting and review.
+This document locks the current AI behavior and JSON interfaces for hinting and review. On the current branch, these contracts are used by the extension background worker when it calls OpenAI directly with a user-provided key.
 
 ## Hint Behavior
 
@@ -50,7 +50,7 @@ Reviews should:
 }
 ```
 
-### `POST /api/hint` request
+### Hint request
 
 ```json
 {
@@ -61,9 +61,9 @@ Reviews should:
 }
 ```
 
-`hintLevel` is any integer `>= 1`. The backend treats `1` as the lightest nudge, `2` as pattern guidance, and `3+` as stronger direction without handing over the full solution.
+`hintLevel` is any integer `>= 1`. The extension treats `1` as the lightest nudge, `2` as pattern guidance, and `3+` as stronger direction without handing over the full solution.
 
-### `POST /api/hint` response
+### Hint response
 
 ```json
 {
@@ -72,9 +72,9 @@ Reviews should:
 }
 ```
 
-### Internal `POST /api/hint/stream` transport
+### Internal hint stream transport
 
-This is an internal extension-to-local-backend transport used by the background worker so the panel can render partial hint text while the final structured hint is still generating.
+This is an internal panel-to-background transport used so the panel can render partial hint text while the final structured hint is still generating.
 
 The response is newline-delimited JSON events:
 
@@ -106,7 +106,7 @@ The response is newline-delimited JSON events:
 }
 ```
 
-### `POST /api/review` request
+### Review request
 
 ```json
 {
@@ -116,7 +116,7 @@ The response is newline-delimited JSON events:
 }
 ```
 
-### `POST /api/review` response
+### Review response
 
 ```json
 {
@@ -127,7 +127,7 @@ The response is newline-delimited JSON events:
 }
 ```
 
-### API error response
+### Runtime error response
 
 ```json
 {
@@ -162,14 +162,12 @@ The response is newline-delimited JSON events:
 
 ## Output Requirements
 
-- API responses should be structured JSON only.
-- The backend should not return markdown-heavy or conversational blobs.
+- Hint and review responses should be structured JSON only.
+- The background integration should not return markdown-heavy or conversational blobs.
 - If model output is malformed, retry or return a typed error for the UI to render.
-- Local development runs the API at `http://127.0.0.1:8787` by default.
-- The local API may use OpenAI when `OPENAI_API_KEY` is configured.
-- If `OPENAI_API_KEY` is missing, the backend falls back to the local heuristic generator.
-- `OPENAI_MODEL` can override the backend model selection.
-- `LEETCODE_INTERVIEWER_FALLBACK_TO_LOCAL=false` disables heuristic fallback when OpenAI fails.
+- The extension stores the user's API key locally in the active Chrome profile.
+- The extension background worker calls OpenAI directly for hint and review generation.
+- The model can be changed in the panel setup card and defaults to `gpt-4.1-mini`.
 - OpenAI requests use structured JSON schema output and short output-token caps to keep hint and review text compact.
-- The backend trims long problem descriptions, candidate notes, and code before sending them to the model to reduce latency.
+- The background worker trims long problem descriptions, candidate notes, and code before sending them to the model to reduce latency.
 - Hint requests use an internal streamed channel through the extension background worker so the panel can render partial hint text before the final structured response completes.

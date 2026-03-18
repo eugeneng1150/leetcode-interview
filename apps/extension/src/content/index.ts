@@ -1,7 +1,14 @@
 import type { HintRequest, ReviewRequest } from "@leetcode-interviewer/shared";
 import { extractEditorSnapshot } from "../lib/editor-content";
 import { setDistractionSectionsHidden } from "../lib/page-distractions";
-import { requestHint, requestReview } from "../lib/api-client";
+import {
+  clearAssistantSettings,
+  loadAssistantSettings,
+  requestHint,
+  requestReview,
+  saveAssistantSettings,
+  testAssistantConnection
+} from "../lib/api-client";
 import { extractProblemContext, isSupportedProblemPage } from "../lib/problem-page";
 import {
   clearLocalData,
@@ -104,6 +111,7 @@ async function syncPanel(): Promise<void> {
 
   const controller = createInterviewPanel(host, {
     context,
+    loadAssistantSettings,
     loadLastSessionSummary,
     loadSessionHistory,
     loadNotes() {
@@ -116,6 +124,7 @@ async function syncPanel(): Promise<void> {
       distractionsHidden = hidden;
       return setDistractionSectionsHidden(document, hidden);
     },
+    onClearAssistantSettings: clearAssistantSettings,
     onHintRequest(input) {
       return requestHint(
         {
@@ -137,7 +146,9 @@ async function syncPanel(): Promise<void> {
       return saveProblemNotes(context.problemUrl, notes);
     },
     onResetLocalData: clearLocalData,
-    onSessionComplete: saveSessionSummary
+    onSessionComplete: saveSessionSummary,
+    onSaveAssistantSettings: saveAssistantSettings,
+    onTestAssistantConnection: testAssistantConnection
   });
 
   mountedPanel = {
