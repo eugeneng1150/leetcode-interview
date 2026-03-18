@@ -1,6 +1,6 @@
 # Next Steps
 
-This file tracks what is left to build for the local-first free-tier version of LeetCode Interviewer Mode.
+This file tracks what is left to build for the local-first version of LeetCode Interviewer Mode.
 
 ## Current State
 
@@ -8,10 +8,9 @@ Working locally today:
 
 - unpacked Chrome extension loads on supported LeetCode problem pages
 - Interview Mode panel mounts and persists across LeetCode SPA navigation
-- timer, notes autosave, hint usage tracking, and local review flow work
+- timer, notes autosave, and local review flow work
 - the panel can collapse to a compact state to get out of the way while solving
-- hint limit is enforced locally at `3` per day
-- review limit is enforced locally at `1` per session
+- hints and reviews are available without local quota caps
 - recent session history, last session summary, and reset-local-data controls exist
 - a local API server exists for `POST /api/hint` and `POST /api/review`
 - the extension is wired to the local API through the background service worker
@@ -56,7 +55,7 @@ Tasks:
 
 - improve loading and error messaging around review
 - make the saved session summary more readable
-- decide whether the free-tier `1 review per session` state needs any more visual treatment beyond the current disabled button and status copy
+- improve repeated-review UX so it is obvious the user can rerun review after editing notes or code
 
 ### 3. Better Hint UX
 
@@ -64,7 +63,6 @@ Tasks:
 
 - make hint progression more explicit in the UI
 - show which hint level the user is on before the request is sent
-- improve exhausted-state messaging further if needed
 - evaluate whether streamed hint text should render with a more obvious loading state or cursor effect
 
 ### 4. Local Debug Mode
@@ -77,7 +75,6 @@ Tasks:
 
 ## Later
 
-- server-side quota enforcement if needed
 - local-to-hosted environment configuration
 - packaging for Chrome Web Store
 

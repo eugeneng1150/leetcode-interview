@@ -1,23 +1,22 @@
-# Product Spec: Free Tier
+# Product Spec
 
 ## Summary
 
-The first release builds the free tier of LeetCode Interviewer Mode as a Chrome extension overlay for LeetCode problem pages. The goal is to make practice feel more interview-like without expanding into paid or advanced features.
+The first release builds the current local-first version of LeetCode Interviewer Mode as a Chrome extension overlay for LeetCode problem pages. The goal is to make practice feel more interview-like without expanding into paid or advanced features.
 
-## Free-Tier Features
+## Current Features
 
 - Interview Mode toggle
 - session timer
 - collapsible side panel
 - hide and restore solution and discussion sections
 - approach notes input
-- 3 progressive hints per day
-- 1 basic review per session
+- progressive hints with no hard cap
+- repeatable basic review requests
 - local session summary
 
 ## Out of Scope
 
-- unlimited hints
 - advanced interviewer follow-up flows
 - voice mode
 - company-specific mock modes
@@ -31,15 +30,13 @@ The first release builds the free tier of LeetCode Interviewer Mode as a Chrome 
 3. User enables Interview Mode.
 4. Timer starts when the interview session starts.
 5. User can hide distracting sections and write approach notes.
-6. User can request hints progressively, up to the daily limit, and see hint text stream into the panel while it is generating.
-7. User can request 1 basic review after attempting the problem.
+6. User can request hints progressively and see hint text stream into the panel while it is generating.
+7. User can request basic review after attempting the problem, including multiple times in the same session if needed.
 8. Session summary is saved locally when the session ends or the review completes.
 
 ## Locked Defaults
 
-- Free-tier daily hint limit: `3`
-- In-session hint ladder: `3` levels
-- Reviews per session: `1`
+- In-session hint ladder: `3` guidance levels, with unlimited requests
 - Session persistence: local only
 
 ## Required UX States
@@ -50,7 +47,6 @@ The first release builds the free tier of LeetCode Interviewer Mode as a Chrome 
 - hint loading
 - hint streaming
 - review loading
-- quota exhausted
 - backend error
 - saved session summary
 

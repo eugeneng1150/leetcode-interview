@@ -1,25 +1,25 @@
 # LeetCode Interviewer Mode
 
-LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice feel more like a real technical interview. The first build targets the free tier only.
+LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice feel more like a real technical interview. The current build is local-first, OpenAI-compatible, and usable without a paid layer.
 
 ## Status
 
-This repository now has a working local prototype of the free-tier extension plus a local API server for hint and review requests. The current build supports OpenAI-backed hints and review through the local backend, streamed hint rendering in the panel, editor code extraction, and local session persistence. The current focus is browser-level QA, selector reliability, and UI polish before any deployment work.
+This repository now has a working local prototype of the extension plus a local API server for hint and review requests. The current build supports OpenAI-backed hints and review through the local backend, streamed hint rendering in the panel, editor code extraction, and local session persistence. The current focus is browser-level QA, selector reliability, and UI polish before any deployment work.
 
-## Free-Tier Scope
+## Current Scope
 
 The first build includes:
 
 - Interview Mode toggle
 - timer
 - collapsible side panel
-- 3 progressive hints per day
+- progressive hints with no hard cap
 - basic AI review
+- repeat review requests during a session
 - local session summary
 
 The first build does not include:
 
-- unlimited hints
 - voice mode
 - analytics dashboard
 - company-style modes
@@ -33,18 +33,18 @@ The first build does not include:
 4. The extension can hide solution and discussion areas.
 5. The user types approach notes and requests hints when needed.
 6. Hints stream into the panel as they are generated.
-7. The user requests 1 basic review after attempting the problem.
+7. The user requests basic AI review after attempting the problem.
 8. The session summary is saved locally.
 
 ## Agent Ownership
 
-The free-tier build is split into 5 agents:
+The current build is split into 5 agents:
 
 - Extension Shell Agent: extension bootstrap, manifest, content-script mount, top-level wiring
 - LeetCode DOM Agent: problem-page detection, metadata extraction, solution and discussion selectors
 - Interview Panel Agent: panel UI, timer, toggle, notes, hint and review actions, state rendering
-- AI Backend Agent: `/api/hint`, `/api/review`, prompts, output validation, free-tier quota behavior
-- Persistence and QA Agent: local storage schema, daily hint tracking, session summaries, manual validation
+- AI Backend Agent: `/api/hint`, `/api/review`, prompts, output validation, OpenAI integration
+- Persistence and QA Agent: local storage schema, session summaries, manual validation
 
 Detailed ownership and handoff rules live in `AGENTS.md`.
 
@@ -53,7 +53,7 @@ Detailed ownership and handoff rules live in `AGENTS.md`.
 1. Build the extension shell and DOM integration in parallel.
 2. Build the panel UI against stable page-detection and metadata contracts.
 3. Build the hint and review backend against fixed JSON interfaces.
-4. Add local persistence, daily quota tracking, and end-to-end QA.
+4. Add local persistence and end-to-end QA.
 
 ## Locked Interfaces
 
@@ -77,7 +77,7 @@ The full shapes are documented in `docs/prompt-design.md`.
 ## Repository Docs
 
 - `AGENTS.md`: agent ownership, boundaries, contracts, and definition of done
-- `docs/product-spec.md`: free-tier feature behavior and UX states
+- `docs/product-spec.md`: current feature behavior and UX states
 - `docs/dom-selectors.md`: DOM integration contract and selector policy
 - `docs/prompt-design.md`: prompt rules, API contracts, and output requirements
 - `next-step.md`: current build backlog and implementation checklist
@@ -88,7 +88,7 @@ The repo is scaffolded for parallel implementation:
 
 - `apps/extension`: Chrome extension shell and LeetCode page integration
 - `apps/api`: hint and review API skeleton
-- `packages/shared`: shared contracts and free-tier constants
+- `packages/shared`: shared contracts
 - `docs`: planning and implementation source-of-truth docs
 
 ## Local OpenAI Setup
@@ -104,12 +104,12 @@ If `OPENAI_API_KEY` is missing, the backend falls back to the local heuristic ge
 
 ## Success Criteria
 
-The first build is successful when a user can:
+The current build is successful when a user can:
 
 - open a supported LeetCode problem
 - start Interview Mode
-- use up to 3 progressive hints in a day
-- receive 1 basic structured review per session
+- request progressive hints without a hard cap
+- request repeated basic structured reviews when needed
 - finish a session and have it saved locally
 
 ## Current Build Tracking

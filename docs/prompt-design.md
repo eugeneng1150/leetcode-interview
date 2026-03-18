@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document locks the free-tier AI behavior and JSON interfaces for hinting and review.
+This document locks the current AI behavior and JSON interfaces for hinting and review.
 
 ## Hint Behavior
 
@@ -60,6 +60,8 @@ Reviews should:
   "hintLevel": 1
 }
 ```
+
+`hintLevel` is any integer `>= 1`. The backend treats `1` as the lightest nudge, `2` as pattern guidance, and `3+` as stronger direction without handing over the full solution.
 
 ### `POST /api/hint` response
 
@@ -151,11 +153,11 @@ The response is newline-delimited JSON events:
 }
 ```
 
-## Free-Tier Policy Defaults
+## Behavior Defaults
 
-- Daily hint limit: `3`
-- Hint ladder levels per session: `3`
-- Basic reviews per session: `1`
+- Hint ladder levels: `3+`
+- Hint requests: unlimited
+- Review requests: unlimited
 - Session persistence: local only
 
 ## Output Requirements

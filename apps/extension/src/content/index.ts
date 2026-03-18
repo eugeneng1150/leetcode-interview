@@ -5,8 +5,6 @@ import { requestHint, requestReview } from "../lib/api-client";
 import { extractProblemContext, isSupportedProblemPage } from "../lib/problem-page";
 import {
   clearLocalData,
-  consumeDailyHint,
-  loadDailyHintUsage,
   loadLastSessionSummary,
   loadSessionHistory,
   loadProblemNotes,
@@ -106,7 +104,6 @@ async function syncPanel(): Promise<void> {
 
   const controller = createInterviewPanel(host, {
     context,
-    getDailyHintUsage: loadDailyHintUsage,
     loadLastSessionSummary,
     loadSessionHistory,
     loadNotes() {
@@ -140,7 +137,6 @@ async function syncPanel(): Promise<void> {
       return saveProblemNotes(context.problemUrl, notes);
     },
     onResetLocalData: clearLocalData,
-    onUseHint: consumeDailyHint,
     onSessionComplete: saveSessionSummary
   });
 

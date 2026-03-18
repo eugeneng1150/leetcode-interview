@@ -1,5 +1,4 @@
 import {
-  DAILY_FREE_HINT_LIMIT,
   type HintResponse,
   type ProblemContext,
   type ReviewResponse,
@@ -7,19 +6,12 @@ import {
 } from "@leetcode-interviewer/shared";
 import type { EditorSnapshot } from "../lib/editor-content";
 
-type HintUsageState = {
-  used: number;
-  remaining: number;
-  limit: number;
-};
-
 type PanelController = {
   destroy(): Promise<void>;
 };
 
 type PanelOptions = {
   context: ProblemContext;
-  getDailyHintUsage(): Promise<HintUsageState>;
   loadLastSessionSummary(): Promise<SessionSummary | null>;
   loadSessionHistory(): Promise<SessionSummary[]>;
   loadNotes(): Promise<string>;
@@ -33,7 +25,6 @@ type PanelOptions = {
   onNotesChange(notes: string): Promise<void>;
   onResetLocalData(): Promise<void>;
   onReviewRequest(input: { approach: string; code: string }): Promise<ReviewResponse>;
-  onUseHint(): Promise<HintUsageState & { allowed: boolean }>;
   onSessionComplete(summary: SessionSummary): Promise<void>;
 };
 
@@ -64,7 +55,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   header.style.marginBottom = "14px";
 
   const eyebrow = document.createElement("p");
-  eyebrow.textContent = "FREE TIER";
+  eyebrow.textContent = "LOCAL MODE";
   eyebrow.style.margin = "0 0 6px";
   eyebrow.style.fontSize = "11px";
   eyebrow.style.letterSpacing = "0.16em";
@@ -161,7 +152,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
   const hintUsageCard = createCard();
   hintUsageCard.style.marginBottom = "14px";
-  const hintUsageLabel = createMetaLabel("Hints Today");
+  const hintUsageLabel = createMetaLabel("Hint Progress");
   const hintUsageValue = document.createElement("p");
   hintUsageValue.style.margin = "4px 0 0";
   hintUsageValue.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
@@ -172,7 +163,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   hintUsageMeta.style.fontSize = "12px";
   hintUsageMeta.style.lineHeight = "1.4";
   hintUsageMeta.style.color = "#667085";
-  hintUsageMeta.textContent = `Free tier includes up to ${DAILY_FREE_HINT_LIMIT} hints per day.`;
+  hintUsageMeta.textContent = "Hints are unlimited. Level 1 nudges, Level 2 patterns, Level 3+ stronger direction.";
   hintUsageCard.append(hintUsageLabel, hintUsageValue, hintUsageMeta);
 
   const notesLabel = createMetaLabel("Talk Through Your Approach");
@@ -317,7 +308,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       status.textContent = "Interview session started.";
       startTimer();
       notes.focus();
-      await refreshHintUsage();
+      refreshHintProgress();
       renderCollapsedState();
       return;
     }
@@ -350,16 +341,6 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       return;
     }
 
-    const currentUsage = await options.getDailyHintUsage();
-    if (currentUsage.remaining === 0) {
-      hintButton.disabled = true;
-      hintText.textContent = `Free tier limit reached. You have used all ${currentUsage.limit}/${currentUsage.limit} hints for today.`;
-      followUp.textContent = "Come back tomorrow for more hints, or continue with your notes and review.";
-      status.textContent = `Free tier limit reached: ${currentUsage.limit}/${currentUsage.limit} hints used today.`;
-      await refreshHintUsage();
-      return;
-    }
-
     hintButton.disabled = true;
     status.textContent = "Generating hint...";
     hintText.textContent = "Generating hint...";
@@ -368,7 +349,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     try {
       const response = await options.onHintRequest({
         userAttempt: notes.value.trim(),
-        hintLevel: Math.min(hintCount + 1, DAILY_FREE_HINT_LIMIT),
+        hintLevel: hintCount + 1,
         onProgress(partialHint) {
           if (!partialHint.trim()) {
             return;
@@ -380,25 +361,15 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
         }
       });
 
-      const usage = await options.onUseHint();
-      if (!usage.allowed) {
-        hintButton.disabled = true;
-        hintText.textContent = `Free tier limit reached. You have used all ${usage.limit}/${usage.limit} hints for today.`;
-        followUp.textContent = "Come back tomorrow for more hints, or continue with your notes and review.";
-        status.textContent = `Free tier limit reached: ${usage.limit}/${usage.limit} hints used today.`;
-        await refreshHintUsage();
-        return;
-      }
-
       hintCount += 1;
       renderHint(response, hintText, followUp);
       status.textContent = `Hint ${hintCount} ready.`;
-      await refreshHintUsage();
+      refreshHintProgress();
       renderCollapsedState();
     } catch (error) {
       followUp.textContent = "";
       status.textContent = formatErrorMessage(error, "Hint request failed.");
-      await refreshHintUsage();
+      refreshHintProgress();
       renderCollapsedState();
     }
   });
@@ -406,11 +377,6 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   reviewButton.addEventListener("click", async () => {
     if (!interviewActive) {
       status.textContent = "Start the interview before requesting review.";
-      return;
-    }
-
-    if (reviewRequested) {
-      status.textContent = "Free tier includes 1 review per session. Start a new session for another review.";
       return;
     }
 
@@ -485,7 +451,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     lastEditorSnapshot = null;
     status.textContent = "Local extension data cleared.";
 
-    await refreshHintUsage();
+    refreshHintProgress();
     await refreshLastSession(lastSessionText);
     await refreshRecentSessions(recentSessionsList);
     diagnosticsText.textContent = buildDiagnosticsSummary(options.context, options.getEditorSnapshot());
@@ -541,31 +507,24 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   async function hydrate(): Promise<void> {
     const [savedNotes] = await Promise.all([
       options.loadNotes(),
-      refreshHintUsage(),
       refreshLastSession(lastSessionText),
       refreshRecentSessions(recentSessionsList)
     ]);
     notes.value = savedNotes;
+    refreshHintProgress();
     diagnosticsText.textContent = buildDiagnosticsSummary(options.context, options.getEditorSnapshot());
     renderCollapsedState();
     applyCollapsedLayout();
   }
 
-  async function refreshHintUsage(): Promise<void> {
-    const usage = await options.getDailyHintUsage();
-    hintUsageValue.textContent = `${usage.remaining} remaining today (${usage.used}/${usage.limit} used)`;
-    if (usage.remaining === 0) {
-      hintUsageMeta.textContent = `Free tier limit reached for today. The limit resets tomorrow on your local date.`;
-    } else {
-      hintUsageMeta.textContent = `Free tier includes up to ${usage.limit} hints per day.`;
-    }
-
-    updateHintButton(usage);
-    renderCollapsedState(usage);
-
-    if (!interviewActive) {
-      return;
-    }
+  function refreshHintProgress(): void {
+    const nextLevel = hintCount + 1;
+    hintUsageValue.textContent =
+      hintCount === 0 ? "No hints used yet. Next hint: Level 1." : `${hintCount} used. Next hint: ${formatHintLevel(nextLevel)}.`;
+    hintUsageMeta.textContent =
+      "Hints are unlimited. Level 1 nudges, Level 2 patterns, Level 3+ stronger direction.";
+    updateHintButton();
+    renderCollapsedState();
   }
 
   async function refreshLastSession(target: HTMLElement): Promise<void> {
@@ -671,16 +630,8 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     renderCollapsedState();
   }
 
-  function updateHintButton(usage: HintUsageState): void {
-    if (usage.remaining === 0) {
-      hintButton.textContent = `Hint Limit Reached (${usage.limit}/${usage.limit})`;
-      if (interviewActive) {
-        hintButton.disabled = true;
-      }
-      return;
-    }
-
-    hintButton.textContent = `Get Hint (${usage.used}/${usage.limit})`;
+  function updateHintButton(): void {
+    hintButton.textContent = `Get ${formatHintLevel(hintCount + 1)} Hint`;
     if (interviewActive) {
       hintButton.disabled = false;
     }
@@ -693,13 +644,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       return;
     }
 
-    if (reviewRequested) {
-      reviewButton.textContent = "Review Used (1/1)";
-      reviewButton.disabled = true;
-      return;
-    }
-
-    reviewButton.textContent = "Review My Attempt";
+    reviewButton.textContent = reviewRequested ? "Review My Attempt Again" : "Review My Attempt";
     reviewButton.disabled = false;
   }
 
@@ -718,15 +663,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
     renderCollapsedState();
   }
 
-  function renderCollapsedState(usage?: HintUsageState): void {
-    const currentUsage =
-      usage ??
-      ({
-        used: Number(hintButton.textContent?.match(/\((\d)\/(\d)\)/)?.[1] ?? 0),
-        remaining: 0,
-        limit: DAILY_FREE_HINT_LIMIT
-      } satisfies Partial<HintUsageState>);
-
+  function renderCollapsedState(): void {
     collapsedModeValue.textContent = interviewActive ? "Interview Active" : "Ready";
     collapsedTimer.textContent = timer.textContent;
     collapsedHints.textContent = interviewActive
@@ -734,10 +671,6 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
       : reviewRequested
         ? "Last action: review saved"
         : "Panel collapsed";
-
-    if (usage && usage.remaining === 0) {
-      collapsedHints.textContent = "Daily hint limit reached";
-    }
   }
 }
 
@@ -745,6 +678,18 @@ function formatElapsed(totalSeconds: number): string {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function formatHintLevel(level: number): string {
+  if (level <= 1) {
+    return "Level 1";
+  }
+
+  if (level === 2) {
+    return "Level 2";
+  }
+
+  return "Level 3+";
 }
 
 function createButton(label: string, variant: "primary" | "secondary"): HTMLButtonElement {

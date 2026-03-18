@@ -1,6 +1,3 @@
-export const DAILY_FREE_HINT_LIMIT = 3;
-export const FREE_REVIEW_LIMIT_PER_SESSION = 1;
-
 export type Difficulty = "Easy" | "Medium" | "Hard" | null;
 
 export type ProblemContext = {

@@ -2,17 +2,17 @@
 
 ## Project Goal
 
-Build the free tier of LeetCode Interviewer Mode first. The free tier includes the Interview Mode toggle, timer, 3 progressive hints per day, basic AI review, and local session summaries.
+Build the local-first version of LeetCode Interviewer Mode first. The current scope includes the Interview Mode toggle, timer, progressive hints, basic AI review, and local session summaries.
 
 ## Global Rules
 
 - Prefer TypeScript throughout the implementation.
-- Keep the scope narrow to the free tier.
+- Keep the scope narrow to the current local-first build.
 - Isolate LeetCode-specific logic from general extension UI logic.
 - Do not rely on undocumented brittle selectors.
 - Any selector change must update `docs/dom-selectors.md`.
 - Any prompt or API contract change must update `docs/prompt-design.md`.
-- Local persistence is the default for session summaries and free-tier usage tracking in v1.
+- Local persistence is the default for session summaries in v1.
 
 ## Agent Ownership
 
@@ -30,7 +30,7 @@ Does not own:
 
 - LeetCode selectors
 - prompt design
-- quota logic details
+- backend call details
 
 ### 2. LeetCode DOM Agent
 
@@ -56,7 +56,7 @@ Owns:
 - toggle behavior
 - approach notes input
 - hint and review action states
-- unsupported, loading, error, and quota-exhausted states
+- unsupported, loading, error, and repeated-action states
 
 Does not own:
 
@@ -73,7 +73,7 @@ Owns:
 - prompt templates
 - model integration
 - structured response validation
-- free-tier quota behavior at the API boundary if enforced server-side
+- stable hint and review behavior at the API boundary
 
 Does not own:
 
@@ -86,7 +86,6 @@ Does not own:
 Owns:
 
 - local storage keys and session schema
-- daily hint usage tracking
 - session summary persistence
 - manual validation plan
 - regression checks across multiple LeetCode problems
@@ -108,14 +107,14 @@ Does not own:
 
 ## Definition of Done
 
-The free-tier implementation is done when:
+The current implementation is done when:
 
 - the extension works on at least 3 LeetCode problem pages
 - the panel mounts only on supported problem pages
 - no page-breaking console errors occur during the main flow
 - the user can toggle Interview Mode and run the timer
-- the user can request hints up to the daily limit of 3
-- the user can request 1 basic review per session
+- the user can request progressive hints without a hard cap
+- the user can request basic review more than once if needed
 - the session summary is saved locally
 
 ## Working Agreement
