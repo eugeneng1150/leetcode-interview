@@ -26,7 +26,7 @@ export async function testOpenAIConnection(): Promise<AssistantConnectionStatus>
     await client.responses.create({
       model: settings.model,
       input: "Reply with OK.",
-      max_output_tokens: 8
+      max_output_tokens: 16
     });
 
     return {

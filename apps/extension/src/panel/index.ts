@@ -60,14 +60,8 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   header.style.justifyContent = "space-between";
   header.style.gap = "12px";
   header.style.marginBottom = "14px";
-
-  const eyebrow = document.createElement("p");
-  eyebrow.textContent = "LOCAL MODE";
-  eyebrow.style.margin = "0 0 6px";
-  eyebrow.style.fontSize = "11px";
-  eyebrow.style.letterSpacing = "0.16em";
-  eyebrow.style.fontWeight = "700";
-  eyebrow.style.color = "#9a6700";
+  header.style.cursor = "grab";
+  header.style.touchAction = "none";
 
   const titleGroup = document.createElement("div");
   titleGroup.style.minWidth = "0";
@@ -77,6 +71,9 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   title.style.margin = "0 0 4px";
   title.style.fontSize = "28px";
   title.style.lineHeight = "1.1";
+  title.style.color = "#111827";
+  title.style.fontWeight = "700";
+  title.style.textShadow = "0 1px 0 rgba(255, 255, 255, 0.35)";
 
   const problem = document.createElement("p");
   problem.textContent = options.context.problemTitle;
@@ -86,7 +83,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   problem.style.fontSize = "13px";
   problem.style.lineHeight = "1.4";
 
-  titleGroup.append(eyebrow, title, problem);
+  titleGroup.append(title, problem);
 
   const collapseButton = createButton("Collapse", "secondary");
   collapseButton.style.padding = "10px 12px";
@@ -349,8 +346,68 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   let distractionsHidden = false;
   let lastEditorSnapshot: EditorSnapshot | null = null;
   let collapsed = false;
+  let dragPointerId: number | null = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
 
   void hydrate();
+
+  header.addEventListener("pointerdown", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest("button, input, textarea")) {
+      return;
+    }
+
+    const rect = root.getBoundingClientRect();
+    dragPointerId = event.pointerId;
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    root.style.right = "";
+    root.style.left = `${rect.left}px`;
+    root.style.top = `${rect.top}px`;
+    root.style.bottom = "";
+    root.style.transition = "none";
+    header.style.cursor = "grabbing";
+    header.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  header.addEventListener("pointermove", (event) => {
+    if (dragPointerId !== event.pointerId) {
+      return;
+    }
+
+    const width = root.offsetWidth;
+    const height = root.offsetHeight;
+    const maxLeft = Math.max(0, window.innerWidth - width);
+    const maxTop = Math.max(0, window.innerHeight - height);
+    const nextLeft = clamp(event.clientX - dragOffsetX, 0, maxLeft);
+    const nextTop = clamp(event.clientY - dragOffsetY, 0, maxTop);
+
+    root.style.left = `${nextLeft}px`;
+    root.style.top = `${nextTop}px`;
+  });
+
+  header.addEventListener("pointerup", (event) => {
+    if (dragPointerId !== event.pointerId) {
+      return;
+    }
+
+    dragPointerId = null;
+    header.style.cursor = "grab";
+    header.releasePointerCapture(event.pointerId);
+    root.style.transition = "width 180ms ease, padding 180ms ease";
+  });
+
+  header.addEventListener("pointercancel", (event) => {
+    if (dragPointerId !== event.pointerId) {
+      return;
+    }
+
+    dragPointerId = null;
+    header.style.cursor = "grab";
+    root.style.transition = "width 180ms ease, padding 180ms ease";
+  });
 
   startButton.addEventListener("click", async () => {
     if (!interviewActive) {
@@ -633,6 +690,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
         options.onDistractionToggle(false);
       }
 
+      header.style.cursor = "grab";
       stopTimer();
       root.remove();
     }
@@ -811,9 +869,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
   function applyCollapsedLayout(): void {
     body.style.display = collapsed ? "none" : "";
     collapsedSummary.style.display = collapsed ? "" : "none";
-    problem.style.display = collapsed ? "none" : "";
-    eyebrow.style.display = collapsed ? "none" : "";
-    title.textContent = collapsed ? "IM" : "Interview Mode";
+    titleGroup.style.display = collapsed ? "none" : "";
     title.style.fontSize = collapsed ? "18px" : "28px";
     collapseButton.textContent = collapsed ? "Expand" : "Collapse";
     collapseButton.style.minWidth = collapsed ? "72px" : "90px";
@@ -838,6 +894,10 @@ function formatElapsed(totalSeconds: number): string {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function formatHintLevel(level: number): string {

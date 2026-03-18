@@ -80,6 +80,8 @@ The full shapes are documented in `docs/prompt-design.md`.
 - `docs/product-spec.md`: current feature behavior and UX states
 - `docs/dom-selectors.md`: DOM integration contract and selector policy
 - `docs/prompt-design.md`: prompt rules, API contracts, and output requirements
+- `docs/chrome-web-store.md`: submission checklist, listing copy, and release prep
+- `docs/privacy-policy.md`: privacy policy draft for public publishing
 - `next-step.md`: current build backlog and implementation checklist
 
 ## Repository Structure
