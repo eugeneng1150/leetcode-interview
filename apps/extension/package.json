@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@leetcode-interviewer/shared": "*"
+    "@leetcode-interviewer/shared": "*",
+    "openai": "^6.31.0"
   }
 }

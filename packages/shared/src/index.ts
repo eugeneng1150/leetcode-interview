@@ -19,6 +19,24 @@ export type HintResponse = {
   followUpQuestion: string;
 };
 
+export type AssistantSettingsSummary = {
+  hasApiKey: boolean;
+  apiKeyLabel: string | null;
+  model: string;
+};
+
+export type SaveAssistantSettingsInput = {
+  apiKey: string;
+  model: string;
+};
+
+export type AssistantConnectionStatus = {
+  configured: boolean;
+  ok: boolean;
+  message: string;
+  model: string;
+};
+
 export type HintStreamEvent =
   | {
       type: "hint_delta";

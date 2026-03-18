@@ -2,7 +2,7 @@
 
 ## Summary
 
-The first release builds the current local-first version of LeetCode Interviewer Mode as a Chrome extension overlay for LeetCode problem pages. The goal is to make practice feel more interview-like without expanding into paid or advanced features.
+The first release builds the current local-first version of LeetCode Interviewer Mode as a Chrome extension overlay for LeetCode problem pages. The goal is to make practice feel more interview-like without expanding into paid or advanced features, while letting each user bring their own OpenAI API key.
 
 ## Current Features
 
@@ -13,6 +13,7 @@ The first release builds the current local-first version of LeetCode Interviewer
 - approach notes input
 - progressive hints with no hard cap
 - repeatable basic review requests
+- in-panel OpenAI key and model setup
 - local session summary
 
 ## Out of Scope
@@ -27,12 +28,13 @@ The first release builds the current local-first version of LeetCode Interviewer
 
 1. User opens a supported LeetCode problem page.
 2. Extension detects the page and mounts the Interview Mode panel.
-3. User enables Interview Mode.
-4. Timer starts when the interview session starts.
-5. User can hide distracting sections and write approach notes.
-6. User can request hints progressively and see hint text stream into the panel while it is generating.
-7. User can request basic review after attempting the problem, including multiple times in the same session if needed.
-8. Session summary is saved locally when the session ends or the review completes.
+3. User saves an OpenAI API key in the panel setup card.
+4. User enables Interview Mode.
+5. Timer starts when the interview session starts.
+6. User can hide distracting sections and write approach notes.
+7. User can request hints progressively and see hint text stream into the panel while it is generating.
+8. User can request basic review after attempting the problem, including multiple times in the same session if needed.
+9. Session summary is saved locally when the session ends or the review completes.
 
 ## Locked Defaults
 
@@ -42,12 +44,13 @@ The first release builds the current local-first version of LeetCode Interviewer
 ## Required UX States
 
 - unsupported page
+- OpenAI not configured
 - ready to start
 - interview active
 - hint loading
 - hint streaming
 - review loading
-- backend error
+- connection error
 - saved session summary
 
 ## Review Output Requirements

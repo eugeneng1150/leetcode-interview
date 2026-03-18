@@ -1,10 +1,10 @@
 # LeetCode Interviewer Mode
 
-LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice feel more like a real technical interview. The current build is local-first, OpenAI-compatible, and usable without a paid layer.
+LeetCode Interviewer Mode is a Chrome extension that makes LeetCode practice feel more like a real technical interview. The current build is local-first, OpenAI-compatible, and designed for bring-your-own-key usage without a paid layer.
 
 ## Status
 
-This repository now has a working local prototype of the extension plus a local API server for hint and review requests. The current build supports OpenAI-backed hints and review through the local backend, streamed hint rendering in the panel, editor code extraction, and local session persistence. The current focus is browser-level QA, selector reliability, and UI polish before any deployment work.
+This repository now has a working local prototype of the extension with direct OpenAI requests from the extension background worker, streamed hint rendering in the panel, editor code extraction, and local session persistence. The current focus is browser-level QA, selector reliability, onboarding polish, and Chrome Web Store readiness.
 
 ## Current Scope
 
@@ -43,7 +43,7 @@ The current build is split into 5 agents:
 - Extension Shell Agent: extension bootstrap, manifest, content-script mount, top-level wiring
 - LeetCode DOM Agent: problem-page detection, metadata extraction, solution and discussion selectors
 - Interview Panel Agent: panel UI, timer, toggle, notes, hint and review actions, state rendering
-- AI Backend Agent: `/api/hint`, `/api/review`, prompts, output validation, OpenAI integration
+- AI Integration Agent: prompt templates, model integration, structured response validation, and background request flow
 - Persistence and QA Agent: local storage schema, session summaries, manual validation
 
 Detailed ownership and handoff rules live in `AGENTS.md`.
@@ -52,7 +52,7 @@ Detailed ownership and handoff rules live in `AGENTS.md`.
 
 1. Build the extension shell and DOM integration in parallel.
 2. Build the panel UI against stable page-detection and metadata contracts.
-3. Build the hint and review backend against fixed JSON interfaces.
+3. Build the hint and review integration against fixed JSON interfaces.
 4. Add local persistence and end-to-end QA.
 
 ## Locked Interfaces
@@ -87,20 +87,22 @@ The full shapes are documented in `docs/prompt-design.md`.
 The repo is scaffolded for parallel implementation:
 
 - `apps/extension`: Chrome extension shell and LeetCode page integration
-- `apps/api`: hint and review API skeleton
+- `apps/api`: optional local API prototype kept for experimentation
 - `packages/shared`: shared contracts
 - `docs`: planning and implementation source-of-truth docs
 
 ## Local OpenAI Setup
 
-To use OpenAI-backed hints and reviews through the local API:
+To use OpenAI-backed hints and reviews in the extension:
 
-1. Copy `apps/api/.env.example` to `apps/api/.env` or `apps/api/.env.local`
-2. Set `OPENAI_API_KEY`
-3. Optionally change `OPENAI_MODEL`
-4. Run `npm run dev:api`
+1. Build the extension with `npm run build:extension`
+2. Load `apps/extension/dist` as an unpacked extension in Chrome
+3. Open a supported LeetCode problem page
+4. In the panel, paste your OpenAI API key into the `OpenAI Setup` card
+5. Optionally change the model from the default `gpt-4.1-mini`
+6. Click `Save`, then `Test`
 
-If `OPENAI_API_KEY` is missing, the backend falls back to the local heuristic generator.
+The key is stored locally in that Chrome profile and used directly by the extension background worker.
 
 ## Success Criteria
 

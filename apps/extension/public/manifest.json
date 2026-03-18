@@ -8,8 +8,7 @@
   ],
   "host_permissions": [
     "https://leetcode.com/problems/*",
-    "http://127.0.0.1/*",
-    "http://localhost/*"
+    "https://api.openai.com/*"
   ],
   "background": {
     "service_worker": "background/index.js",

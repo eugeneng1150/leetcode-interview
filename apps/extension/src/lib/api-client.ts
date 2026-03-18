@@ -1,10 +1,13 @@
 import type {
   ApiError,
+  AssistantConnectionStatus,
+  AssistantSettingsSummary,
   HintRequest,
   HintResponse,
   HintStreamEvent,
   ReviewRequest,
-  ReviewResponse
+  ReviewResponse,
+  SaveAssistantSettingsInput
 } from "@leetcode-interviewer/shared";
 
 export class ApiClientError extends Error {
@@ -88,6 +91,42 @@ export async function requestReview(input: ReviewRequest): Promise<ReviewRespons
   return payload;
 }
 
+export async function loadAssistantSettings(): Promise<AssistantSettingsSummary> {
+  const payload = await sendApiMessage("settings:get");
+  if (!isAssistantSettingsSummary(payload)) {
+    throw new ApiClientError("INVALID_BACKGROUND_RESPONSE", "Assistant settings response was malformed.");
+  }
+
+  return payload;
+}
+
+export async function saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<AssistantSettingsSummary> {
+  const payload = await sendApiMessage("settings:save", input);
+  if (!isAssistantSettingsSummary(payload)) {
+    throw new ApiClientError("INVALID_BACKGROUND_RESPONSE", "Assistant settings response was malformed.");
+  }
+
+  return payload;
+}
+
+export async function clearAssistantSettings(): Promise<AssistantSettingsSummary> {
+  const payload = await sendApiMessage("settings:clear");
+  if (!isAssistantSettingsSummary(payload)) {
+    throw new ApiClientError("INVALID_BACKGROUND_RESPONSE", "Assistant settings response was malformed.");
+  }
+
+  return payload;
+}
+
+export async function testAssistantConnection(): Promise<AssistantConnectionStatus> {
+  const payload = await sendApiMessage("settings:test");
+  if (!isAssistantConnectionStatus(payload)) {
+    throw new ApiClientError("INVALID_BACKGROUND_RESPONSE", "Assistant connection response was malformed.");
+  }
+
+  return payload;
+}
+
 async function sendApiMessage(
   kind: "hint",
   payload: HintRequest
@@ -96,7 +135,12 @@ async function sendApiMessage(
   kind: "review",
   payload: ReviewRequest
 ): Promise<unknown>;
-async function sendApiMessage(kind: "hint" | "review", payload: HintRequest | ReviewRequest): Promise<unknown> {
+async function sendApiMessage(kind: "settings:get" | "settings:clear" | "settings:test"): Promise<unknown>;
+async function sendApiMessage(kind: "settings:save", payload: SaveAssistantSettingsInput): Promise<unknown>;
+async function sendApiMessage(
+  kind: "hint" | "review" | "settings:get" | "settings:save" | "settings:clear" | "settings:test",
+  payload?: HintRequest | ReviewRequest | SaveAssistantSettingsInput
+): Promise<unknown> {
   const response = await chrome.runtime.sendMessage({
     kind,
     payload
@@ -151,6 +195,31 @@ function isReviewResponse(value: unknown): value is ReviewResponse {
     typeof value.timeComplexity === "string" &&
     typeof value.spaceComplexity === "string" &&
     typeof value.improvementSuggestion === "string"
+  );
+}
+
+function isAssistantSettingsSummary(value: unknown): value is AssistantSettingsSummary {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.hasApiKey === "boolean" &&
+    (typeof value.apiKeyLabel === "string" || value.apiKeyLabel === null) &&
+    typeof value.model === "string"
+  );
+}
+
+function isAssistantConnectionStatus(value: unknown): value is AssistantConnectionStatus {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.configured === "boolean" &&
+    typeof value.ok === "boolean" &&
+    typeof value.message === "string" &&
+    typeof value.model === "string"
   );
 }
 
