@@ -69,4 +69,4 @@ You can:
 
 ## Contact
 
-Replace this section with your public contact email or support page before publishing to the Chrome Web Store.
+For privacy questions or support, contact: e1398550@u.nus.edu
