@@ -16,9 +16,22 @@ export function extractProblemContext(doc: Document, url: URL): ProblemContext |
   return {
     problemTitle: normalizeProblemTitle(title),
     problemDescription: description,
-    problemUrl: url.toString(),
+    problemUrl: normalizeProblemUrl(url),
     difficulty: normalizeDifficulty(difficultyText)
   };
+}
+
+function normalizeProblemUrl(url: URL): string {
+  const normalized = new URL(url.toString());
+  normalized.search = "";
+  normalized.hash = "";
+
+  const pathname = normalized.pathname.replace(/\/+$/, "");
+  normalized.pathname = pathname.endsWith("/description")
+    ? pathname.slice(0, -"/description".length) || "/"
+    : pathname || "/";
+
+  return normalized.toString();
 }
 
 function normalizeProblemTitle(value: string): string {

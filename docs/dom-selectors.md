@@ -15,6 +15,7 @@ The DOM layer must publish a normalized problem payload with:
 - `problemTitle`
 - `problemDescription`
 - `problemUrl`
+  Canonicalize this to the stable problem page URL. Do not include query params, hashes, or `/description` suffix variants.
 - `difficulty` when available, otherwise `null`
 
 ## Required Detectable Regions

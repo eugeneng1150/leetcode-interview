@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetCode Interviewer Mode",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Adds interview-style practice flows to LeetCode problem pages.",
   "icons": {
     "16": "icon-16.png",

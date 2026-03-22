@@ -814,6 +814,7 @@ export function createInterviewPanel(container: HTMLElement, options: PanelOptio
 
       elapsedSeconds = Math.max(0, Math.floor((Date.now() - sessionStartMs) / 1000));
       timer.textContent = formatElapsed(elapsedSeconds);
+      renderCollapsedState();
     }, 1000);
   }
 
